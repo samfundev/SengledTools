@@ -80,3 +80,17 @@ python sengled_tool.py --ip 192.168.8.1 --udp-json '{"func":"set_device_color","
 - Brightness: 0-100
 
 
+## Function discovery and errors
+
+- There may be more UDP functions than listed here. You can send any known payload via `--udp-json`.
+- If you call a non-existent function, the bulb responds like:
+```json
+{"result":{"ret":1,"msg":"function not find"}}
+```
+- If the function exists but parameters are wrong, you'll see an error tied to that function, e.g.:
+```text
+< Received UDP response: {"func":"set_device_brightness","result":{"ret":1,"msg":"get brightness error"}}
+```
+- Brute-forcing function names is useless; errors are generic and won’t reliably enumerate capabilities.
+
+
