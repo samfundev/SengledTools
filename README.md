@@ -137,7 +137,9 @@ python sengled_tool.py --ip 192.168.8.1 --udp-brightness 50
 python sengled_tool.py --ip 192.168.8.1 --udp-color 255 0 0
 ```
 
-Note: UDP control does not require the MQTT broker or HTTP setup server once the bulb is paired and on your LAN.
+**Note:** There might be more UDP commands available. Check [UDP_COMMANDS_REFERENCE.md](UDP_COMMANDS_REFERENCE.md) for the complete list of documented commands.
+
+UDP control does not require the MQTT broker or HTTP setup server once the bulb is paired and on your LAN.
 
 Power loss behavior:
 
@@ -197,7 +199,7 @@ sequenceDiagram
     participant SetupTool as "Setup Tool"
     participant BulbAP as "Bulb (AP 192.168.8.1:9080)"
     participant HttpServer as "Local HTTP Setup Server"
-    participant MqttBroker as "MQTT Broker"
+    participant MqttBroker as "MQTT Broker (<broker-ip>)"
 
     UserPC->>SetupTool: "Run --setup-wifi (--ssid --password)"
     SetupTool->>HttpServer: "Start server (port 80 → 8080 fallback)"
@@ -213,9 +215,10 @@ sequenceDiagram
 
     SetupTool->>BulbAP: "UDP startConfigRequest (prep)"
     BulbAP-->>SetupTool: "result:true"
-    SetupTool->>BulbAP: "setParamsRequest (RC4+base64)"
+    SetupTool->>BulbAP: "setParamsRequest [RC4+Base64 encrypted]"
     Note right of SetupTool: "Includes appServerDomain and jbalancerDomain URLs\n+ Wi‑Fi SSID/password (or BSSID)"
-    BulbAP-->>SetupTool: "ack (plain or encrypted)"
+    Note over SetupTool,BulbAP: Payload is RC4-encrypted and then base64-encoded (see KEY_STR in code)
+    BulbAP-->>SetupTool: "ack"
     SetupTool->>BulbAP: "endConfigRequest"
 
     BulbAP->>HttpServer: "POST /life2/device/accessCloud.json"
