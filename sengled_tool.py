@@ -679,6 +679,7 @@ def main():
     udp_group.add_argument("--udp-off", action="store_true", help="Turn the bulb off via UDP.")
     udp_group.add_argument("--udp-brightness", type=int, help="Set brightness via UDP (0-100).")
     udp_group.add_argument("--udp-color", nargs=3, metavar=("R", "G", "B"), help="Set color via UDP (0-255 for each).")
+    udp_group.add_argument("--udp-json", help="Send a custom JSON payload via UDP (e.g. '{\"func\":\"set_device_switch\",\"param\":{\"switch\":1}}').")
 
     control_group.add_argument("--topic", help="Custom MQTT topic to publish to.")
     control_group.add_argument("--payload", help="Custom payload to send (raw string, not JSON).")
@@ -708,8 +709,17 @@ def main():
                 send_udp_command(args.ip, payload)
             else:
                 print("Error: Color values must be between 0 and 255")
+        elif args.udp_json:
+            try:
+                parsed = json.loads(args.udp_json)
+                if not isinstance(parsed, dict):
+                    print("Error: --udp-json must be a JSON object (e.g. {\"func\":..., \"param\":{...}})")
+                else:
+                    send_udp_command(args.ip, parsed)
+            except json.JSONDecodeError:
+                print("Error: Invalid JSON for --udp-json")
         else:
-            print("Error: --ip requires a UDP command (--udp-on, --udp-off, --udp-brightness, or --udp-color)")
+            print("Error: --ip requires a UDP command (--udp-on, --udp-off, --udp-brightness, --udp-color, or --udp-json)")
     elif args.setup_wifi:
         if args.ssid and args.password:
             tool.non_interactive_wifi_setup(args.broker_ip, args.ssid, args.password)
