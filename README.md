@@ -31,8 +31,7 @@ pip install -r requirements.txt
 2. Factory reset the bulb to enter AP mode.
 
    * Rapidly toggle power 5–10 times until it broadcasts `Sengled_Wi‑Fi_Bulb_...`.
-3. Connect your computer to the bulb’s AP: `Sengled_Wi‑Fi_Bulb_...`.
-4. Run the Wi‑Fi setup:
+3. Run the Wi‑Fi setup:
 
    * Interactive:
 
@@ -40,32 +39,20 @@ pip install -r requirements.txt
       # If --broker-ip is omitted, the tool uses this PC's local IP automatically
       python sengled_tool.py --setup-wifi
      ```
+     Connect your computer to the bulb’s AP: `Sengled_Wi‑Fi_Bulb_...` when prompted
    * Non‑interactive:
 
+     Connect your computer to the bulb’s AP: `Sengled_Wi‑Fi_Bulb_...` first.
      ```
       # If --broker-ip is omitted, the tool uses this PC's local IP automatically
       python sengled_tool.py --setup-wifi --ssid "YourSSID" --password "YourWifiPassword"
      ```
-5. If the embedded HTTP server can’t bind to 80/8080, stop whatever is on those ports or set `SENGLED_HTTP_PORT`.
-6. The bulb will hit:
+4. If the embedded HTTP server can’t bind to 80/8080, stop whatever is on those ports or set `SENGLED_HTTP_PORT`.
+5. The bulb will hit:
 
    * `POST/GET /life2/device/accessCloud.json`
    * `POST/GET /jbalancer/new/bimqtt`
      Then it connects to your MQTT broker.
-
-### Interactive Wi‑Fi setup (prompts for SSID/password)
-
-```
-# If --broker-ip is omitted, the tool uses this PC's local IP automatically
-python sengled_tool.py --setup-wifi
-```
-
-### Non‑interactive Wi‑Fi setup
-
-```
-# If --broker-ip is omitted, the tool uses this PC's local IP automatically
-python sengled_tool.py --setup-wifi --ssid "YourSSID" --password "YourWifiPassword"
-```
 
 What happens:
 
@@ -94,9 +81,9 @@ python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --brigh
 # Set color (R G B; 0-255 each)
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --color 255 0 0
 
-# Set color temperature (2700-6500K)
+# Set color temperature (0-100% as 2700-6500K)
 # Note: When changing color temperature, include a switch ON in the same payload (the app does this automatically).
-python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --color-temp 3000
+python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --color-temp 65
 
 # Query status
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --status
