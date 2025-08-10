@@ -66,4 +66,4 @@ python sengled_tool.py --ip 192.168.8.1 --udp-color 0 0 255
 - Color values: RGB 0-255
 - Brightness: 0-100
 
-This reference intentionally omits `extras/udp_commander.py`. All supported UDP controls are available via `sengled_tool.py`.
+
