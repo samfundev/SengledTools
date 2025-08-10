@@ -39,13 +39,12 @@ The bulb requires an MQTT broker that accepts TLS connections.
 "C:\Program Files\OpenSSL-Win64\bin\openssl.exe" x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 3650 -sha256
 ```
 
-4. Place the `mosquitto.conf` configuration file from this repo in the same directory as your generated certificate and key files (`ca.crt`, `server.crt`, `server.key`), adjusting file names if you used different names during certificate generation.
+4. Place your generated certificate and key files (`ca.crt`, `server.crt`, `server.key`) in the project root directory alongside the `mosquitto.conf` file, adjusting file names if you used different names during certificate generation.
 5. Start Mosquitto with the bundled config:
 
-   * Windows (PowerShell):
+   * Windows (PowerShell) — run the terminal as Administrator and ideally `cd` to the project root first:
 
      ```
-     # Ideally cd to the project root first
      "C:\Program Files\mosquitto\mosquitto.exe" -c .\mosquitto.conf -v
      ```
    * Linux/macOS:

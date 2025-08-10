@@ -23,10 +23,10 @@ pip install -r requirements.txt
 
 1. Start your MQTT broker (e.g., Mosquitto). See more information and examples in [INSTRUCTIONS.md](INSTRUCTIONS.md).
 
-   * Windows example:
+   * Windows example (run terminal as Administrator and ideally `cd` to the project root first):
 
      ```
-     mosquitto.exe -c path\to\mosquitto.conf -v
+      "C:\\Program Files\\mosquitto\\mosquitto.exe" -c .\\mosquitto.conf -v
      ```
 2. Factory reset the bulb to enter AP mode.
 
@@ -151,9 +151,9 @@ Power loss behavior:
 
 ### Troubleshooting quick actions
 
-- Start the local HTTP setup server so the bulb can fetch MQTT settings:
+- Start the local HTTP setup server so the bulb can fetch MQTT settings (use `--broker-ip` to force a specific broker IP — most likely your PC or wherever your broker is running):
   ```
-  python fake_sengled_server.py
+  python fake_sengled_server.py --broker-ip 192.168.0.100
   ```
 
 - Factory reset options:
