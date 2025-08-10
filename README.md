@@ -124,17 +124,19 @@ python sengled_tool.py --broker-ip 192.168.0.100 \
 ### UDP control (direct local commands)
 
 ```
+# Replace <bulb-ip> with the bulb's IP
+
 # Turn on
-python sengled_tool.py --ip 192.168.8.1 --udp-on
+python sengled_tool.py --ip <bulb-ip> --udp-on
 
 # Turn off
-python sengled_tool.py --ip 192.168.8.1 --udp-off
+python sengled_tool.py --ip <bulb-ip> --udp-off
 
 # Set brightness (0-100)
-python sengled_tool.py --ip 192.168.8.1 --udp-brightness 50
+python sengled_tool.py --ip <bulb-ip> --udp-brightness 50
 
 # Set color (R G B; 0-255 each)
-python sengled_tool.py --ip 192.168.8.1 --udp-color 255 0 0
+python sengled_tool.py --ip <bulb-ip> --udp-color 255 0 0
 ```
 
 **Note:** There might be more UDP commands available. Check [UDP_COMMANDS_REFERENCE.md](UDP_COMMANDS_REFERENCE.md) for the complete list of documented commands.
@@ -151,7 +153,7 @@ Power loss behavior:
 
 ### Troubleshooting quick actions
 
-- Start the local HTTP setup server so the bulb can fetch MQTT settings (use `--broker-ip` to force a specific broker IP — most likely your PC or wherever your broker is running):
+- Start the local HTTP setup server so the bulb can fetch MQTT settings (use `--broker-ip` to force a specific broker IP — most likely your PC or wherever your broker is running; on Windows run terminal as Administrator):
   ```
   python fake_sengled_server.py --broker-ip 192.168.0.100
   ```
@@ -164,10 +166,10 @@ Power loss behavior:
     ```
     python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --reset
     ```
-* Ensure broker is running (Windows example):
+* Ensure broker is running (Windows example — run terminal as Administrator and ideally `cd` to the project root first):
 
   ```
-  mosquitto.exe -c path\to\mosquitto.conf -v
+  "C:\\Program Files\\mosquitto\\mosquitto.exe" -c .\\mosquitto.conf -v
   ```
  
 
