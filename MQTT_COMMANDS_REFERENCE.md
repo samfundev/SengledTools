@@ -229,19 +229,26 @@ python sengled_tool.py --help | grep -A 10 "UDP Control"
 - Cool White: `"6500"` (6500K)
 - Daylight: `"5500"` (5500K)
 
-### **Color Mode Control**
+### **White Presets (App mapping)**
 
-**Set Color Mode:**
+When using the app's White tab, the bundle sends `colorTemperature` on a 0–100 scale and also turns the bulb on in the same payload.
+
+Presets mapping (from decompiled app bundle):
+
+- Warm → `0`
+- Soft → `17`
+- White → `39`
+- Daylight → `58`
+- Cool → `100`
+
+Example (set Daylight preset and turn on):
+
 ```json
 {
   "topic": "wifielement/80:A0:36:E1:8E:B8/update",
-  "downMsg": "Os$[{\"dn\":\"80:A0:36:E1:8E:B8\",\"type\":\"colorMode\",\"value\":\"1\",\"time\":1662036404644}]"
+  "downMsg": "Os$[{\"dn\":\"80:A0:36:E1:8E:B8\",\"type\":\"colorTemperature\",\"value\":\"58\",\"time\":1662036404644},{\"dn\":\"80:A0:36:E1:8E:B8\",\"type\":\"switch\",\"value\":\"1\",\"time\":1662036404644}]"
 }
 ```
-
-**Color Mode Values:**
-- **`"1"`**: RGB color mode
-- **`"2"`**: White/color temperature mode
 
 ### **Effect Status Control**
 
@@ -516,7 +523,7 @@ python sengled_tool.py --help | grep -A 10 "UDP Control"
 - **`"brightness"`**: Brightness level (`"0"` to `"100"`)
 - **`"color"`**: RGB color (hex format)
 - **`"colorTemperature"`**: Color temperature (Kelvin)
-- **`"colorMode"`**: Color mode (`"1"` = RGB, `"2"` = white/temperature)
+- (colorMode is reported-only; see Reported Attributes)
 - **`"effectStatus"`**: Effect status (`"0"` = off, `"7"` = audio sync, `"100"` = video sync, `"101"` = game sync)
 - **`"white"`**: White light control (alternative to colorTemperature)
 
@@ -543,6 +550,16 @@ python sengled_tool.py --help | grep -A 10 "UDP Control"
 
 #### **Query Types**
 - **`"status"`**: Status query
+
+## 🛰️ Reported Attributes (from bulb status)
+
+- **colorMode**: reported by the bulb, indicates which LED engine is active. Not a control command.
+  - `1` = RGB color mode
+  - `2` = White/color-temperature mode
+
+Note: The app may also show effects with a separate status, but colorMode itself is not a command to send.
+
+---
 
 ### **ControlType Constants**
 From the app source code:
@@ -659,7 +676,7 @@ def send_via_http(mac: str, cmd_type: str, value: str, gradient_time: int = None
 
 2. **Payload Format**: This tool uses a plain JSON array for control commands; firmware updates use a raw URL string
 
-3. **Auto-Switch Logic**: When setting `colorTemperature`, the app automatically adds a `switch: "1"` command
+3. **Auto-Switch Logic**: When setting `colorTemperature`, include a `switch: "1"` command in the same payload (the official app does this automatically)
 
 4. **Timestamp**: All commands include a `time` field with current epoch milliseconds
 
