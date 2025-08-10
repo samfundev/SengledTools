@@ -139,41 +139,13 @@ python sengled_tool.py --ip 192.168.8.1 --udp-color 255 0 0
 
 Note: UDP control does not require the MQTT broker or HTTP setup server once the bulb is paired and on your LAN.
 
-### Start a broker
-
-* Use Mosquitto (or any MQTT broker) reachable from the bulb. The bundled `mosquitto.conf` enables anonymous access for local testing. Do not expose publicly.
-* TLS is required by most bulbs. This tool always uses TLS. Configure Mosquitto with your local CA and server certificate on the listener you advertise to the bulb (default 1883).
-* See INSTRUCTIONS.md for step‑by‑step broker setup and TLS certificate generation.
-* If you change the broker port, update `--broker-ip`/port in usage or `BROKER_PORT` in `sengled_tool.py` accordingly.
+<!-- Broker setup details moved to INSTRUCTIONS.md -->
 
 Power loss behavior:
 
 * After a power cycle, some bulbs re‑query the HTTP endpoints (`/life2/device/accessCloud.json` and `/jbalancer/new/bimqtt`) to fetch MQTT settings before connecting. Make sure your MQTT broker is already running. If the bulb doesn’t reconnect, re‑run Wi‑Fi setup to spin up the embedded HTTP server again so the endpoints are reachable.
 
-### TLS certificate quickstart (OpenSSL)
-
-Generate a local CA and server cert (CN must be your broker IP):
-
-```
-openssl genrsa -out ca.key 2048
-openssl req -x509 -new -key ca.key -days 3650 -out ca.crt -subj "/CN=Local-CA"
-
-set BROKER_IP=192.168.0.100
-openssl genrsa -out server.key 2048
-openssl req -new -key server.key -out server.csr -subj "/CN=%BROKER_IP%"
-openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 3650 -sha256
-```
-
-Configure Mosquitto (same listener port you’ll advertise to the bulb):
-
-```
-listener 1883
-allow_anonymous true
-protocol mqtt
-cafile ca.crt
-certfile server.crt
-keyfile server.key
-```
+<!-- TLS/SSL details moved to INSTRUCTIONS.md -->
 
 ### Troubleshooting quick actions
 
@@ -205,13 +177,7 @@ keyfile server.key
 
     This attempts port 80 and falls back to 8080. If you use a non‑default port, ensure pairing pointed the bulb to that port.
 
-### Start Mosquitto (Windows example)
-
-Open a terminal where `mosquitto.exe` is installed and run:
-
-```
-mosquitto.exe -c path\to\mosquitto.conf -v
-```
+<!-- Mosquitto start example moved to INSTRUCTIONS.md -->
 
 ---
 
