@@ -857,10 +857,12 @@ def main():
                     r, g, b = args.color
                     r, g, b = int(r), int(g), int(b)
                     if all(0 <= val <= 255 for val in [r, g, b]):
-                        color_hex = f"{r:02X}{g:02X}{b:02X}"
+                        color_hex = f"{r:d}:{g:d}:{b:d}"
                         ts = get_current_epoch_ms()
-                        command = [{"dn": args.mac, "type": "color", "value": color_hex, "time": ts}]
-                        send_update_command(client, args.mac, command)
+                        commands = [
+                            {"dn": args.mac, "type": "color", "value": color_hex, "time": ts}
+                        ]
+                        send_update_command(client, args.mac, commands)
                     else:
                         print("Error: Color values must be between 0 and 255")
                 except ValueError as ve:
