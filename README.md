@@ -95,6 +95,7 @@ python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --brigh
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --color 255 0 0
 
 # Set color temperature (2700-6500K)
+# Note: When changing color temperature, include a switch ON in the same payload (the app does this automatically).
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --color-temp 3000
 
 # Query status
