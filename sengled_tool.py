@@ -704,13 +704,19 @@ def main():
             else:
                 print("Error: Brightness must be between 0 and 100")
         elif args.udp_color:
-            r, g, b = args.udp_color
-            if all(0 <= val <= 255 for val in [r, g, b]):
-                color_hex = f"{int(r):02X}{int(g):02X}{int(b):02X}"
-                payload = {"func": "set_device_color", "param": {"color": color_hex}}
-                send_udp_command(args.ip, payload)
-            else:
-                print("Error: Color values must be between 0 and 255")
+            try:
+                r, g, b = args.udp_color
+                r, g, b = int(r), int(g), int(b)
+                if all(0 <= val <= 255 for val in [r, g, b]):
+                    color_hex = f"{int(r):02X}{int(g):02X}{int(b):02X}"
+                    payload = {"func": "set_device_color", "param": {"color": color_hex}}
+                    send_udp_command(args.ip, payload)
+                else:
+                    print("Error: Color values must be between 0 and 255")
+            except TypeError as ve:
+                print(f"Error: Could not convert input to integer for --udp-color: {args.udp_color}. Exception: {ve}")
+            except TypeError as te:
+                    print(f"TypeError: Bad type in color arguments {args.udp_color}: {te}")
         elif args.udp_json:
             try:
                 custom = json.loads(args.udp_json)
@@ -846,14 +852,21 @@ def main():
                     print("Error: Brightness must be between 0 and 100")
 
             elif args.color:
-                r, g, b = args.color
-                if all(0 <= val <= 255 for val in [r, g, b]):
-                    color_hex = f"{int(r):02X}{int(g):02X}{int(b):02X}"
-                    ts = get_current_epoch_ms()
-                    command = [{"dn": args.mac, "type": "color", "value": color_hex, "time": ts}]
-                    send_update_command(client, args.mac, command)
-                else:
-                    print("Error: Color values must be between 0 and 255")
+                print(f"DEBUG: args.color = {args.color} (type: {type(args.color)})")
+                try:
+                    r, g, b = args.color
+                    r, g, b = int(r), int(g), int(b)
+                    if all(0 <= val <= 255 for val in [r, g, b]):
+                        color_hex = f"{r:02X}{g:02X}{b:02X}"
+                        ts = get_current_epoch_ms()
+                        command = [{"dn": args.mac, "type": "color", "value": color_hex, "time": ts}]
+                        send_update_command(client, args.mac, command)
+                    else:
+                        print("Error: Color values must be between 0 and 255")
+                except ValueError as ve:
+                    print(f"Error: Could not convert input to integer for --color: {args.color}. Exception: {ve}")
+                except TypeError as te:
+                    print(f"TypeError: Bad type in color arguments {args.color}: {te}")
 
             elif args.color_temp is not None:
                 if 2700 <= args.color_temp <= 6500:
