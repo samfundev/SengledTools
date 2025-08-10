@@ -185,3 +185,44 @@ Power loss behavior:
 * I don’t use Home Assistant. Can I still control bulbs?
 
   * Yes, but you’ll need a custom solution unless someone publishes an integration. Options: a small Android app, a simple script/service on a PC or server triggered by your phone (shortcuts/webhooks), or any automation that publishes the documented MQTT or UDP commands.
+
+
+### Wi‑Fi setup sequence (reverse‑engineered)
+
+The following diagram shows the local AP-mode pairing flow: what the tool sends to the bulb, what the bulb fetches from your local HTTP server, and how it connects to your MQTT broker. This matches the actual behavior in `sengled_tool.py` and the documented endpoints.
+
+```mermaid
+sequenceDiagram
+    participant UserPC as "User PC"
+    participant SetupTool as "Setup Tool"
+    participant BulbAP as "Bulb (AP 192.168.8.1:9080)"
+    participant HttpServer as "Local HTTP Setup Server"
+    participant MqttBroker as "MQTT Broker"
+
+    UserPC->>SetupTool: "Run --setup-wifi (--ssid --password)"
+    SetupTool->>HttpServer: "Start server (port 80 → 8080 fallback)"
+    SetupTool->>BulbAP: "UDP startConfigRequest"
+    BulbAP-->>SetupTool: "Handshake + MAC"
+
+    opt "Interactive scan"
+        SetupTool->>BulbAP: "scanWifiRequest"
+        BulbAP-->>SetupTool: "scan in progress"
+        SetupTool->>BulbAP: "getAPListRequest"
+        BulbAP-->>SetupTool: "routers list"
+    end
+
+    SetupTool->>BulbAP: "UDP startConfigRequest (prep)"
+    BulbAP-->>SetupTool: "result:true"
+    SetupTool->>BulbAP: "setParamsRequest (RC4+base64)"
+    Note right of SetupTool: "Includes appServerDomain and jbalancerDomain URLs\n+ Wi‑Fi SSID/password (or BSSID)"
+    BulbAP-->>SetupTool: "ack (plain or encrypted)"
+    SetupTool->>BulbAP: "endConfigRequest"
+
+    BulbAP->>HttpServer: "POST /life2/device/accessCloud.json"
+    HttpServer-->>BulbAP: '{"success": true, "messageCode": "200"}'
+    BulbAP->>HttpServer: "POST /jbalancer/new/bimqtt"
+    HttpServer-->>BulbAP: '{"protocal":"mqtt","host":"<broker-ip>","port":1883}'
+
+    BulbAP->>MqttBroker: "Connect"
+    MqttBroker-->>BulbAP: "ConnAck / ready"
+```
