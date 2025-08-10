@@ -708,8 +708,8 @@ def main():
                 r, g, b = args.udp_color
                 r, g, b = int(r), int(g), int(b)
                 if all(0 <= val <= 255 for val in [r, g, b]):
-                    color_hex = f"{int(r):02X}{int(g):02X}{int(b):02X}"
-                    payload = {"func": "set_device_color", "param": {"color": color_hex}}
+                    color_dec = f"{r:d}:{g:d}:{b:d}"
+                    payload = {"func": "set_device_color", "param": {"color": color_dec}}
                     send_udp_command(args.ip, payload)
                 else:
                     print("Error: Color values must be between 0 and 255")
@@ -857,10 +857,10 @@ def main():
                     r, g, b = args.color
                     r, g, b = int(r), int(g), int(b)
                     if all(0 <= val <= 255 for val in [r, g, b]):
-                        color_hex = f"{r:d}:{g:d}:{b:d}"
+                        color_dec = f"{r:d}:{g:d}:{b:d}"
                         ts = get_current_epoch_ms()
                         commands = [
-                            {"dn": args.mac, "type": "color", "value": color_hex, "time": ts}
+                            {"dn": args.mac, "type": "color", "value": color_dec, "time": ts}
                         ]
                         send_update_command(client, args.mac, commands)
                     else:
