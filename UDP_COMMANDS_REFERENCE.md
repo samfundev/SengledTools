@@ -87,10 +87,10 @@ python sengled_tool.py --ip 192.168.8.1 --udp-json '{"func":"set_device_color","
 ```json
 {"result":{"ret":1,"msg":"function not find"}}
 ```
-- If the function exists but parameters are wrong, you'll see an error tied to that function, e.g.:
-```text
-< Received UDP response: {"func":"set_device_brightness","result":{"ret":1,"msg":"get brightness error"}}
+ - If the function exists but parameters are wrong, you'll see an error tied to that function, e.g.:
+```json
+{"func":"set_device_brightness","result":{"ret":1,"msg":"get brightness error"}}
 ```
-- Brute-forcing function names is useless; errors are generic and won’t reliably enumerate capabilities.
+ - Probing names is useful for discovery: unknown → `function not find`; existing with wrong params → function-specific error. Use that signal to hunt valid functions and iterate parameters.
 
 
