@@ -45,7 +45,7 @@ openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out s
    * Windows (PowerShell):
 
      ```
-     mosquitto.exe -c .\mosquitto.conf -v
+     "C:\Program Files\mosquitto\mosquitto.exe" -c .\mosquitto.conf -v
      ```
    * Linux/macOS:
 
