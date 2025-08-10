@@ -642,7 +642,7 @@ def main():
     parser = argparse.ArgumentParser(description="Sengled Local Control Tool", formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument("--setup-wifi", action="store_true", help="Start interactive Wi-Fi setup.")
-    parser.add_argument("--broker-ip", default="192.168.0.100", help="IP address of your MQTT broker.")
+    parser.add_argument("--broker-ip", default=None, help="IP address of your MQTT broker (defaults to this PC's local IP if omitted).")
     parser.add_argument("--mqtt-port", type=int, default=BROKER_PORT, help="MQTT broker port (default: 1883).")
     parser.add_argument("--ca-crt", help="Path to CA certificate (default: ca.crt)")
     parser.add_argument("--server-crt", help="Path to server certificate (default: server.crt)")
@@ -685,6 +685,8 @@ def main():
     control_group.add_argument("--payload", help="Custom payload to send (raw string, not JSON).")
 
     args = parser.parse_args()
+    # Resolve broker IP: use provided value or fall back to local IP
+    resolved_broker_ip = args.broker_ip or get_local_ip()
     tool = SengledTool()
 
     # Handle UDP commands first (they take precedence)
@@ -722,9 +724,9 @@ def main():
             print("Error: --ip requires a UDP command (--udp-on, --udp-off, --udp-brightness, --udp-color, or --udp-json)")
     elif args.setup_wifi:
         if args.ssid and args.password:
-            tool.non_interactive_wifi_setup(args.broker_ip, args.ssid, args.password)
+            tool.non_interactive_wifi_setup(resolved_broker_ip, args.ssid, args.password)
         else:
-            tool.interactive_wifi_setup(args.broker_ip)
+            tool.interactive_wifi_setup(resolved_broker_ip)
     elif args.group_macs:
         # Handle group commands (including single MAC)
         if not (args.group_switch or args.group_brightness or args.group_color_temp):
@@ -733,7 +735,7 @@ def main():
         
         # Initialize MQTT client for group control
         client = MQTTClient(
-            args.broker_ip,
+            resolved_broker_ip,
             port=args.mqtt_port,
             use_tls=True,
             ca_certs=args.ca_crt,
@@ -799,7 +801,7 @@ def main():
     elif args.mac:
         # Initialize MQTT client for bulb control
         client = MQTTClient(
-            args.broker_ip,
+            resolved_broker_ip,
             port=args.mqtt_port,
             use_tls=True,
             ca_certs=args.ca_crt,

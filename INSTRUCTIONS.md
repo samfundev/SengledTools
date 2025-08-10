@@ -60,13 +60,15 @@ The bulb requires an MQTT broker that accepts TLS connections.
   **Note:** Replace `192.168.0.100` in the examples with the local IP address of the device running the broker (most likely your PC).
 
 ```
-python sengled_tool.py --setup-wifi --broker-ip 192.168.0.100
+# If --broker-ip is omitted, the tool uses this PC's local IP automatically
+python sengled_tool.py --setup-wifi
 ```
 
 * Non‑interactive:
 
 ```
-python sengled_tool.py --setup-wifi --broker-ip 192.168.0.100 --ssid "YourSSID" --password "YourWifiPassword"
+# If --broker-ip is omitted, the tool uses this PC's local IP automatically
+python sengled_tool.py --setup-wifi --ssid "YourSSID" --password "YourWifiPassword"
 ```
 
 The tool starts an embedded HTTP server, waits for the bulb to call `/life2/device/accessCloud.json` and `/jbalancer/new/bimqtt`, then (if it detects the bulb’s LAN IP) attempts a UDP ON/OFF test and prints follow‑up command examples.
@@ -99,3 +101,5 @@ python sengled_tool.py --ip 192.168.0.247 --udp-off
 ```
 python fake_sengled_server.py
 ```
+
+**Note:** The server defaults to your PC's local IP; use `--broker-ip` if your broker is on another device or for troubleshooting.

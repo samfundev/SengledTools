@@ -37,12 +37,14 @@ pip install -r requirements.txt
    * Interactive:
 
      ```
-     python sengled_tool.py --setup-wifi --broker-ip 192.168.0.100
+      # If --broker-ip is omitted, the tool uses this PC's local IP automatically
+      python sengled_tool.py --setup-wifi
      ```
    * Non‑interactive:
 
      ```
-     python sengled_tool.py --setup-wifi --broker-ip 192.168.0.100 --ssid "YourSSID" --password "YourWifiPassword"
+      # If --broker-ip is omitted, the tool uses this PC's local IP automatically
+      python sengled_tool.py --setup-wifi --ssid "YourSSID" --password "YourWifiPassword"
      ```
 5. If the embedded HTTP server can’t bind to 80/8080, stop whatever is on those ports or set `SENGLED_HTTP_PORT`.
 6. The bulb will hit:
@@ -54,13 +56,15 @@ pip install -r requirements.txt
 ### Interactive Wi‑Fi setup (prompts for SSID/password)
 
 ```
-python sengled_tool.py --setup-wifi --broker-ip 192.168.0.100
+# If --broker-ip is omitted, the tool uses this PC's local IP automatically
+python sengled_tool.py --setup-wifi
 ```
 
 ### Non‑interactive Wi‑Fi setup
 
 ```
-python sengled_tool.py --setup-wifi --broker-ip 192.168.0.100 --ssid "YourSSID" --password "YourWifiPassword"
+# If --broker-ip is omitted, the tool uses this PC's local IP automatically
+python sengled_tool.py --setup-wifi --ssid "YourSSID" --password "YourWifiPassword"
 ```
 
 What happens:
@@ -149,14 +153,16 @@ Power loss behavior:
   ```
   python fake_sengled_server.py
   ```
+  **Note:** The server defaults to your PC's local IP; use `--broker-ip` if your broker is on another device or for troubleshooting.
   This binds to port 80 (falls back to 8080). If you use a non‑default port, ensure pairing pointed the bulb to that port.
 
 ### Troubleshooting quick actions
 
 - Start the local HTTP setup server so the bulb can fetch MQTT settings (use `--broker-ip` to force a specific broker IP — most likely your PC or wherever your broker is running; on Windows run terminal as Administrator):
   ```
-  python fake_sengled_server.py --broker-ip 192.168.0.100
+  python fake_sengled_server.py
   ```
+  **Note:** The server defaults to your PC's local IP; use `--broker-ip` if your broker is on another device or for troubleshooting.
 
 - Factory reset options:
 
@@ -174,6 +180,16 @@ Power loss behavior:
  
 
 ---
+
+### If UDP commands time out
+
+- **Observed (not 100% confirmed)**: If the bulb can’t reach the local HTTP endpoints (`/life2/device/accessCloud.json` and `/jbalancer/new/bimqtt`) after power-up, it may ignore UDP. Some bulbs appear to re-query these endpoints on boot before enabling MQTT/UDP.
+- **Try this**:
+  1) Start your MQTT broker.
+  2) Run the local HTTP server (it defaults to your PC's IP; use --broker-ip if your broker is on another device or for troubleshooting): `python fake_sengled_server.py`
+  3) Power-cycle the bulb at the wall switch.
+  4) Watch the server logs for a hit to `/jbalancer/new/bimqtt` returning `host: <broker-ip>, port: 1883`.
+  5) Once seen, control via MQTT should resume. If the bulb stays flaky, send a reset via MQTT and redo Wi‑Fi pairing.
 
 ## FAQ
 
