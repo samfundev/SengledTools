@@ -396,9 +396,31 @@ class SengledTool:
     def __init__(self):
         self.wifi_crypto = SengledWiFiCrypto()
 
-    def _perform_wifi_setup(self, broker_ip: str, broker_port: int, wifi_ssid: str, wifi_pass: str, wifi_bssid: str = None, interactive: bool = True, udp_bulb_ip: str = BULB_IP):
+    def _perform_wifi_setup(
+        self, broker_ip: str, broker_port: int, wifi_ssid: str, wifi_pass: str, wifi_bssid: str = None,
+        interactive: bool = True, udp_bulb_ip: str = BULB_IP
+    ):
         """Private helper method to perform Wi-Fi setup with given credentials."""
-        # 0) Start local HTTP server first
+        # 0) Discover and log system WiFi IP address for HTTP endpoint
+        local_wifi_ip = get_local_ip()
+        Console.section("Setup Preparation")
+        Console.info(f"Detected local Wi-Fi IP address: {local_wifi_ip}")
+        # Prompt for MQTT broker address to be configured
+        if interactive:
+            user_broker_ip = input(f"Enter MQTT broker IP to configure bulb [{broker_ip or local_wifi_ip}]: ").strip()
+            if user_broker_ip:
+                broker_ip = user_broker_ip
+            else:
+                # If user presses enter, default to passed argument or detected IP
+                broker_ip = broker_ip or local_wifi_ip
+        else:
+            broker_ip = broker_ip or local_wifi_ip
+        # Save for later HTTP server binding
+        http_endpoint_ip = local_wifi_ip
+        Console.info("Before continuing, connect your computer to the Sengled bulb's Wi-Fi network (usually named 'Sengled_Wi-Fi Bulb_XXXXXX').")
+        input("Press Enter when you have connected to the bulb's Wi-Fi...")
+
+        # 0) Start local HTTP server first (use remembered WiFi IP as endpoint)
         preferred_http_port = int(os.environ.get("SENGLED_HTTP_PORT", "80") or 80)
         setup_server = _SetupHTTPServer(mqtt_host=broker_ip, mqtt_port=broker_port, preferred_port=preferred_http_port)
         server_started = setup_server.start()
@@ -487,10 +509,9 @@ class SengledTool:
                 else:
                     router_info = {"ssid": "", "bssid": wifi_bssid.upper(), "password": wifi_pass}
                 
-                # Use the actual HTTP setup server port we bound and local host IP
+                # Use the actual HTTP setup server port we bound and the remembered WiFi IP address
                 http_port = str(setup_server.port)
-                http_host = get_local_ip()
-                
+                http_host = http_endpoint_ip
                 params_payload = {
                     "name": "setParamsRequest", "totalStep": 1, "curStep": 1,
                     "payload": {
