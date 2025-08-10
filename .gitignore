@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# certs/keys (do NOT push)
+*.crt
+*.key
+*.csr
+*.srl
+*.pem
+
+# local-only tools and artifacts
+extras/
