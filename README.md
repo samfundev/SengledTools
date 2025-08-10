@@ -139,17 +139,22 @@ python sengled_tool.py --ip 192.168.8.1 --udp-color 255 0 0
 
 Note: UDP control does not require the MQTT broker or HTTP setup server once the bulb is paired and on your LAN.
 
-<!-- Broker setup details moved to INSTRUCTIONS.md -->
-
 Power loss behavior:
 
-* After a power cycle, some bulbs re‑query the HTTP endpoints (`/life2/device/accessCloud.json` and `/jbalancer/new/bimqtt`) to fetch MQTT settings before connecting. Make sure your MQTT broker is already running. If the bulb doesn’t reconnect, re‑run Wi‑Fi setup to spin up the embedded HTTP server again so the endpoints are reachable.
-
-<!-- TLS/SSL details moved to INSTRUCTIONS.md -->
+- After a power cycle, some bulbs re‑query the HTTP endpoints (`/life2/device/accessCloud.json` and `/jbalancer/new/bimqtt`) to fetch MQTT settings before connecting. Make sure your MQTT broker is running. If the bulb doesn’t reconnect, start the local HTTP setup server once:
+  ```
+  python fake_sengled_server.py
+  ```
+  This binds to port 80 (falls back to 8080). If you use a non‑default port, ensure pairing pointed the bulb to that port.
 
 ### Troubleshooting quick actions
 
-* Factory reset options:
+- Start the local HTTP setup server so the bulb can fetch MQTT settings:
+  ```
+  python fake_sengled_server.py
+  ```
+
+- Factory reset options:
 
   * Hardware: rapidly toggle power 5–10 times until the bulb flashes and broadcasts `Sengled_Wi‑Fi Bulb_XXXXXX`.
   * Software: if the bulb is online on your broker, you can send a reset:
@@ -162,22 +167,7 @@ Power loss behavior:
   ```
   mosquitto.exe -c path\to\mosquitto.conf -v
   ```
-* If the bulb isn’t reconnecting to your broker after power loss/reset:
-
-  * Re‑run pairing to bring up the embedded HTTP server:
-
-    ```
-    python sengled_tool.py --setup-wifi --broker-ip 192.168.0.100
-    ```
-  * Or run a minimal local HTTP server that serves the two endpoints expected by the bulb:
-
-    ```
-    python fake_sengled_server.py
-    ```
-
-    This attempts port 80 and falls back to 8080. If you use a non‑default port, ensure pairing pointed the bulb to that port.
-
-<!-- Mosquitto start example moved to INSTRUCTIONS.md -->
+ 
 
 ---
 
