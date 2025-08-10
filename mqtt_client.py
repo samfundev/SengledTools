@@ -2,6 +2,7 @@ import paho.mqtt.client as mqtt
 from typing import Optional
 import time
 import ssl
+import threading
 
 class MQTTClient:
     def __init__(self, broker: str, port: int = 1883, keepalive: int = 60, use_tls: bool = True,
@@ -18,13 +19,16 @@ class MQTTClient:
         self.received_messages = []
         self.client.on_message = self._on_message
         self.client.on_connect = self._on_connect
+        self._connected_event = threading.Event()
+        self._connect_rc = None  # Store result code for inspection
 
     def _on_connect(self, client, userdata, flags, rc):
-        """Callback when connected to MQTT broker"""
+        self._connect_rc = rc
         if rc == 0:
             print(f"Connected to MQTT broker at {self.broker}:{self.port}")
         else:
             print(f"Failed to connect to MQTT broker, return code: {rc}")
+        self._connected_event.set()
 
     def _on_message(self, client, userdata, msg):
         """Callback when message is received"""
@@ -37,23 +41,26 @@ class MQTTClient:
         self.received_messages.append(message)
         print(f"Received message on {msg.topic}: {msg.payload.decode('utf-8')}")
 
-    def connect(self) -> bool:
-        """Connects to the MQTT broker."""
+    def connect(self, timeout: float = 10.0) -> bool:
+        """Connects to the MQTT broker and waits until connection is established or fails."""
         try:
+            self._connected_event.clear()
             if self.use_tls:
-                # Configure TLS
                 self.client.tls_set(
                     ca_certs=self.ca_certs,
-                    certfile=self.certfile, 
+                    certfile=self.certfile,
                     keyfile=self.keyfile,
                     cert_reqs=ssl.CERT_NONE,
                     tls_version=ssl.PROTOCOL_TLSv1_2
                 )
-                self.client.tls_insecure_set(True)  # Allow self-signed certs
-            
+                self.client.tls_insecure_set(True)
             self.client.connect(self.broker, self.port, self.keepalive)
             self.client.loop_start()
-            return True
+            connected = self._connected_event.wait(timeout)
+            if not connected:
+                print(f"Timed out waiting for MQTT connection to {self.broker}:{self.port}")
+                return False
+            return self._connect_rc == 0
         except (ConnectionRefusedError, OSError) as e:
             print(f"MQTT connection to {self.broker}:{self.port} failed: {e}")
             return False
