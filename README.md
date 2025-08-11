@@ -64,7 +64,7 @@ What happens:
   * `POST/GET /jbalancer/new/bimqtt` (returns `{ protocal: "mqtt", host: <broker-ip>, port: 1883 }`)
 * After that, it blinks the bulb via UDP (ON → 3s → OFF) as a quick success indicator.
 
-### MQTT control (via broker)
+### MQTT control (via broker) - [MQTT_COMMANDS_REFERENCE.md](MQTT_COMMANDS_REFERENCE.md)
 
 Use these after the bulb is paired and connected to your broker.
 
