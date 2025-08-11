@@ -30,7 +30,7 @@ pip install -r requirements.txt
      ```
 2. Factory reset the bulb to enter AP mode.
 
-   * Rapidly toggle power 5–10 times until it broadcasts `Sengled_Wi‑Fi_Bulb_...`.
+   * Rapidly toggle power 5 times until it broadcasts `Sengled_Wi‑Fi_Bulb_...`.
 3. Run the Wi‑Fi setup:
 
    * Interactive:

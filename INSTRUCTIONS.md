@@ -5,6 +5,52 @@ This document expands on setup and usage. Refer to the reference files for proto
 * MQTT command reference: [MQTT\_COMMANDS\_REFERENCE.md](MQTT_COMMANDS_REFERENCE.md)
 * UDP command reference: [UDP\_COMMANDS\_REFERENCE.md](UDP_COMMANDS_REFERENCE.md)
 
+## Setup & Control Flow
+
+```mermaid
+graph TD
+    subgraph "Phase 1: One-Time Setup (Do this once per bulb)"
+        A[/"👤 1. Start your MQTT Broker"/] --> B["👤 2. Factory Reset Bulb<br>(Flick power switch rapidly 5+ times)"];
+        B --> C["👤 3. Run the Wi-Fi Setup Command<br><code>python sengled_tool.py --setup-wifi</code>"];
+        
+        C -- "This automatically starts a..." --> D{{"💻 Temporary Web Server<br><i>(Mimics Sengled's online server)</i>"}};
+        
+        E["💡 Bulb (in setup mode)"] -- "Connects to your PC, expecting<br>to find Sengled's cloud server" --> D;
+        D -- "Tells the bulb to use your<br>local MQTT Broker instead" --> E;
+        
+        E -- "Connects to your Wi-Fi,<br>then your local Broker!" --> F[("📡 Your MQTT Broker")];
+        F --> G["✅ Setup Complete! The bulb is now on your local network."];
+    end
+
+    subgraph "Phase 2: Everyday Control (Use these commands anytime)"
+        G --> H{"Choose your control method"};
+        
+        H -- "Control via Broker (MQTT)" --> I["⌨️ 👤 Send command via Broker<br><code>--mac ... --on</code>"];
+        I -- "Command goes to Broker" --> J[("📡 Your MQTT Broker")];
+        J -- "Broker relays command to bulb" --> K((💡 Bulb Receives Command & Responds));
+
+        H -- "Direct Control (UDP)" --> M["⌨️ 👤 Send command directly<br><code>--ip ... --udp-on</code>"];
+        M -- "Command goes straight<br>to the bulb over Wi-Fi" --> K;
+    end
+
+    %% --- STYLES ---
+    style A fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style B fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style C fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style I fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style M fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    
+    style D fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+
+    style E fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
+    style K fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
+
+    style F fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    style J fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+
+    style G fill:#d1c4e9,stroke:#512da8,stroke-width:2px
+```
+
 ## Prerequisites
 
 * Install Python 3.10+ and dependencies:
@@ -12,6 +58,8 @@ This document expands on setup and usage. Refer to the reference files for proto
 ```
 pip install -r requirements.txt
 ```
+
+
 
 * Install an MQTT broker ([Mosquitto download link](https://mosquitto.org/download/)) reachable from the bulb.
 * Connect your computer to the bulb AP `Sengled_Wi‑Fi Bulb_XXXXXX` before pairing.
