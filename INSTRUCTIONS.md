@@ -75,7 +75,7 @@ The tool starts an embedded HTTP server, waits for the bulb to call `/life2/devi
 
 If ports 80/8080 are busy, the tool assumes you run your own HTTP server and will not wait for endpoint hits or run the UDP test.
 
-## Control (MQTT)
+## Control (MQTT) - [MQTT_COMMANDS_REFERENCE.md](MQTT_COMMANDS_REFERENCE.md)
 
 **Note:** Replace `192.168.0.100` with the local IP of the broker host.
 
@@ -86,7 +86,7 @@ python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --brigh
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --color 255 0 0
 ```
 
-## Control (UDP)
+## Control (UDP) - [UDP_COMMANDS_REFERENCE.md](UDP_COMMANDS_REFERENCE.md)
 
 ```
 python sengled_tool.py --ip 192.168.0.247 --udp-on

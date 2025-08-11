@@ -33,7 +33,7 @@ python sengled_tool.py --ip 192.168.8.1 --udp-color 255 0 0
 |--------|------------------|------------------|
 | `set_device_switch` | `{"func":"set_device_switch","param":{"switch":1}}` | `{"func":"set_device_switch","result":{"ret":0,"msg":"success"}}` |
 | `set_device_brightness` | `{"func":"set_device_brightness","param":{"brightness":50}}` | `{"func":"set_device_brightness","result":{"ret":0,"msg":"success"}}` |
-| `set_device_color` | `{"func":"set_device_color","param":{"color":"FF0000"}}` | `{"func":"set_device_color","result":{"ret":0,"msg":"success"}}` |
+| `set_device_color` | `{"func":"set_device_color","param":{"color":"255:0:0"}}` | `{"func":"set_device_color","result":{"ret":0,"msg":"success"}}` |
 
 ---
 
@@ -65,8 +65,8 @@ python sengled_tool.py --ip 192.168.8.1 --udp-json '{"func":"set_device_switch",
 # Brightness 50
 python sengled_tool.py --ip 192.168.8.1 --udp-json '{"func":"set_device_brightness","param":{"brightness":50}}'
 
-# Color red (#FF0000)
-python sengled_tool.py --ip 192.168.8.1 --udp-json '{"func":"set_device_color","param":{"color":"FF0000"}}'
+# Color red (255:0:0 format)
+python sengled_tool.py --ip 192.168.8.1 --udp-json '{"func":"set_device_color","param":{"color":"255:0:0"}}'
 ```
 
 ---
@@ -87,10 +87,13 @@ python sengled_tool.py --ip 192.168.8.1 --udp-json '{"func":"set_device_color","
 ```json
 {"result":{"ret":1,"msg":"function not find"}}
 ```
- - If the function exists but parameters are wrong, you'll see an error tied to that function, e.g.:
+- If the function exists but parameters are wrong, you'll see an error tied to that function, e.g.:
 ```json
 {"func":"set_device_brightness","result":{"ret":1,"msg":"get brightness error"}}
 ```
- - Probing names is useful for discovery: unknown → `function not find`; existing with wrong params → function-specific error. Use that signal to hunt valid functions and iterate parameters.
+- **Function discovery tip**: Send unknown function names to discover what's available:
+  - Unknown function → returns `{"result":{"ret":1,"msg":"function not find"}}`
+  - Valid function with wrong params → returns function-specific error message
+  - Use this pattern to find new functions and figure out their parameters
 
 
