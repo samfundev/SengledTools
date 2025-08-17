@@ -101,11 +101,13 @@ python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC \
   --topic wifielement/E8:DB:8A:AA:BB:CC/update \
   --payload "[{\"dn\":\"E8:DB:8A:AA:BB:CC\",\"type\":\"switch\",\"value\":\"1\",\"time\":1690000000000}]"
 
-# Firmware upgrade (untested)
-# Topic requires raw URL string (not JSON). This path is inferred from logs and code, but not validated end-to-end.
+# Firmware upgrade (Sengled-Rescue path, flashes shim to let you run your own firmware)
+# ⚠️ This is a one-way trip! The *.bin you flash *MUST* be compatible with ESP RTOS SDK bootloader, launching from an OTA
+# partition (unpredictably either ota_0 or ota_1, so you don't know where it will land at the time of update).
+# See sengled_ota/README.md for details.
+# A working shim.bin is included - a compiled copy of Sengled-Rescue - that lets you flash any firmware.
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC \
-  --topic wifibulb/E8:DB:8A:AA:BB:CC/update \
-  --payload "http://192.168.0.100/firmware.bin"
+  --upgrade shim.bin
 
 # Group control (example: switch ON for a list of MACs)
 python sengled_tool.py --broker-ip 192.168.0.100 \
