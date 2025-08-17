@@ -26,12 +26,9 @@ static esp_err_t flash_post(httpd_req_t *req){
     if (!label[0]) strcpy(label, "boot");
 
     uint32_t base=0, limit=0; if (!resolve_target(label, &base, &limit))
-        return send_text(req, "400 Bad Request", "text/plain", "Bad target");
+        return send_text(req, "400 Bad Request", "text/plain", "Bad target, partition %s doesn't exist", label);
 
-    // Compute requested length and basic limit check first
     size_t remaining = req->content_len;
-    if (!remaining || (base + remaining) > limit)
-        return send_text(req, "400 Bad Request", "text/plain", "Bad length");
 
     // Block only if the *actual write range* [base, base+len) overlaps the running image
     const esp_partition_t *run = running_part();
@@ -54,16 +51,16 @@ static esp_err_t flash_post(httpd_req_t *req){
         int r = httpd_req_recv(req, (char*)buf, to_read);
         if (r <= 0) return send_text(req, "500 Internal Server Error", "text/plain", "recv fail\n");
 
-        if (!checked_magic && base==0x00000){ if (buf[0] != 0xE9) return send_text(req, "400 Bad Request", "text/plain", "Not ESP8266 image\n"); checked_magic=true; }
+        if (!checked_magic && base==0x00000){ if (buf[0] != 0xE9) return send_text(req, "400 Bad Request", "text/plain", "Not ESP8266 image slated for boot, avoiding brick\n"); checked_magic=true; }
 
         // erase as needed
         while (addr + r > erased_to){
             uint32_t sec = erased_to / SPI_FLASH_SEC_SIZE;
-            if (spi_flash_erase_sector(sec) != 0) return send_text(req, "500 Internal Server Error", "text/plain", "erase fail\n");
+            if (spi_flash_erase_sector(sec) != 0) return send_text(req, "500 Internal Server Error", "text/plain", "erase fail at sector %d\n",sec);
             erased_to = (sec+1) * SPI_FLASH_SEC_SIZE;
         }
         int wr = (r + 3) & ~3; for (int i=r;i<wr;i++) buf[i]=0xFF;
-        if (spi_flash_write(addr, (uint32_t*)buf, wr) != 0) return send_text(req, "500 Internal Server Error", "text/plain", "write fail\n");
+        if (spi_flash_write(addr, (uint32_t*)buf, wr) != 0) return send_text(req, "500 Internal Server Error", "text/plain", "write fail at sector 0x%08x\n",addr);
         addr += r; remaining -= r;
     }
 
@@ -114,7 +111,7 @@ static esp_err_t clone_self_to_other(void) {
 
 static esp_err_t relocate_post_handler(httpd_req_t *req){
   esp_err_t rc = clone_self_to_other();
-  if (rc != ESP_OK) return send_err(req, "500 Internal Server Error", "relocate failed");
+  if (rc != ESP_OK) return send_text(req, "500 Internal Server Error", "text/plain", "relocate failed");
   httpd_resp_set_type(req, "text/plain");
   httpd_resp_send(req, "Relocated. Rebooting…\n", HTTPD_RESP_USE_STRLEN);
   vTaskDelay(pdMS_TO_TICKS(300));
@@ -125,9 +122,9 @@ static esp_err_t relocate_post_handler(httpd_req_t *req){
 /* ---- Boot other partition (switch) ---- */
 static esp_err_t boot_other_post_handler(httpd_req_t *req){
   const esp_partition_t *other = esp_ota_get_next_update_partition(NULL);
-  if (!other) return send_err(req, "500 Internal Server Error", "no other slot");
+  if (!other) return send_text(req, "500 Internal Server Error", "text/plain", "no other slot");
   if (esp_ota_set_boot_partition(other) != ESP_OK)
-      return send_err(req, "500 Internal Server Error", "set boot failed");
+      return send_text(req, "500 Internal Server Error", "text/plain", "set boot failed");
   httpd_resp_send(req, "OK, rebooting\n", HTTPD_RESP_USE_STRLEN);
   vTaskDelay(pdMS_TO_TICKS(300));
   esp_restart();
