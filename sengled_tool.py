@@ -8,6 +8,7 @@ import argparse
 import json
 import os
 import sys
+import shutil
 import time
 import socket
 import warnings
@@ -144,6 +145,38 @@ class _SetupHTTPServer:
                         "host": outer.mqtt_host,
                         "port": outer.mqtt_port,
                     })
+                    return
+                # Firmware download handler
+                if self.path.endswith(".bin"):
+                    requested = os.path.basename(self.path)
+                    # Only allow direct root requests, not any path structure
+                    if "/" in self.path.strip("/").replace(requested, ""):
+                        print(f"❌ Refused firmware download with path component: {self.path}")
+                        self.send_error(400, "Invalid firmware path")
+                        return
+                    # Prevent dangerous names and empty
+                    if not requested or requested in (".", ".."):
+                        print(f"❌ Refused firmware download with dangerous name: {requested}")
+                        self.send_error(400, "Invalid firmware filename")
+                        return
+                    local_file = os.path.join(os.path.dirname(__file__), requested)
+                    if not os.path.isfile(local_file):
+                        print(f"❌ Firmware file not found: {requested}")
+                        self.send_error(404, "Firmware file not found")
+                        return
+                    try:
+                        with open(local_file, "rb") as fw:
+                            data = fw.read()
+                        self.send_response(200)
+                        self.send_header('Content-Type', 'application/octet-stream')
+                        self.send_header('Content-Disposition', f'attachment; filename="{requested}"')
+                        self.send_header('Content-Length', str(len(data)))
+                        self.end_headers()
+                        self.wfile.write(data)
+                        print(f"📤 Served firmware file: {requested} ({len(data)} bytes)")
+                    except Exception as e:
+                        print(f"❌ Error sending firmware: {e}")
+                        self.send_error(500, "Error sending firmware file")
                     return
 
                 self.send_error(404, "Not Found")
@@ -314,15 +347,25 @@ def get_bulb_status(client: MQTTClient, mac_address: str):
     the behavior observed in broker logs for a successful status query.
     """
     status_topic = f"wifielement/{mac_address}/status"
-    
+
+    # Make sure the network loop is running
+    if hasattr(client, "loop_start"):
+        client.loop_start()
+
+    # Subscribe and wait a beat for SUBACK
     print(f"Subscribing to {status_topic} to listen for the response...")
-    if not client.subscribe(status_topic, qos=1):
-        print("Failed to subscribe to status topic.")
-        return None
+    rc = client.subscribe(status_topic, qos=1)
+    # if your subscribe returns (rc, mid), handle that:
+    if isinstance(rc, tuple):
+        rc, _mid = rc
+# debug
+#    if rc != 0:
+#        print("Failed to subscribe to status topic.")
+#        return None
+    time.sleep(0.2)  # small cushion for SUBACK, or use on_subscribe
 
     # Clear any stale messages
     client.clear_messages()
-    time.sleep(0.2) 
 
     # Publish an EMPTY payload to the status topic. This is the trigger.
     print(f"Requesting status by publishing an empty payload to {status_topic}...")
@@ -330,25 +373,31 @@ def get_bulb_status(client: MQTTClient, mac_address: str):
         print("Failed to publish status request.")
         return None
 
-    print("Waiting for status report from the bulb...")
+    print(f"Waiting for status report from the bulb ({status_topic})...")
     start_time = time.time()
     timeout = 10  # 10 second timeout
 
     # We will receive our own empty message back. We need to ignore it and wait for the real one.
     while time.time() - start_time < timeout:
-        message = client.get_message()
-        if message:
-            received_payload_str = message.get('payload')
+        if hasattr(client, "loop"):
+            client.loop(timeout=0.1)
+        message = client.get_message() if hasattr(client, "get_message") else None
+        if not message:
+            time.sleep(0.05)
+            continue
+
+        received_topic_str = getattr(message, "topic", message.get("topic"))
+        received_payload_str = getattr(message, "payload", message.get("payload"))
             
-            # The echo of our own message will be empty or None. The real status is a JSON list.
-            if not received_payload_str or received_payload_str.strip() == "":
-                print("Ignoring self-echoed empty message...")
-                continue
-                
+        # The echo of our own message will be empty or None. The real status is a JSON list.
+        if received_topic_str != status_topic or not received_payload_str:
+            print("Ignoring self-echoed empty message...")
+            continue
+
             try:
-                received_data = json.loads(received_payload_str)
-                
+                received_data = json.loads(payload if isinstance(payload, str) else payload.decode())
                 if not isinstance(received_data, list):
+                    print("Received something, but not the format we want")
                     continue # Not the format we expect
 
                 # This is it! We got a non-empty JSON payload.
@@ -369,28 +418,6 @@ def get_bulb_status(client: MQTTClient, mac_address: str):
 
     print("Timeout: No status response from the bulb. Please ensure the bulb is online and connected to the broker.")
     return None
-
-def send_firmware_upgrade_command(client: MQTTClient, mac_address: str, firmware_url: str):
-    """
-    Sends a firmware upgrade command to the bulb.
-    Uses the wifibulb topic (not wifielement) and raw URL payload.
-    """
-    upgrade_topic = f"wifibulb/{mac_address}/update"
-    
-    print(f"Sending firmware upgrade command...")
-    print(f"  Topic: {upgrade_topic}")
-    print(f"  Payload: {firmware_url}")
-    
-    # Publish the firmware URL directly (no JSON wrapper)
-    success = client.publish(upgrade_topic, firmware_url, qos=1)
-    
-    if success:
-        print("Firmware upgrade command sent successfully.")
-        time.sleep(0.5)
-        return True
-    else:
-        print("Failed to send firmware upgrade command.")
-        return False
 
 class SengledTool:
     def __init__(self):
@@ -514,7 +541,7 @@ class SengledTool:
                 http_host = http_endpoint_ip
                 params_payload = {
                     "name": "setParamsRequest", "totalStep": 1, "curStep": 1,
-                    "payload": {
+                   "payload": {
                         "userID": "618",
                         "appServerDomain": f"http://{http_host}:{http_port}/life2/device/accessCloud.json",
                         "jbalancerDomain": f"http://{http_host}:{http_port}/jbalancer/new/bimqtt",
@@ -658,6 +685,51 @@ class SengledTool:
     # FIX: Removed redundant and unused get_bulb_status method from this class.
     # The global, corrected function will be used instead.
 
+def startFakeHTTPServer():
+    print("Starting fake Sengled HTTP server...")
+    server = _SetupHTTPServer(
+        mqtt_host=args.broker_ip or get_local_ip(),
+        mqtt_port=args.mqtt_port,
+        preferred_port=args.http_port
+    )
+    started = server.start()
+    if not started:
+        print("Could not start HTTP server, exiting.")
+        return
+
+    print(f"Fake Sengled HTTP server running on port {server.port}.")
+    print("Endpoints:")
+    print("  /life2/device/accessCloud.json")
+    print("  /jbalancer/new/bimqtt")
+    print("  GET  /firmware.bin (or any .bin in script's directory)")
+    print("Press Ctrl+C to stop.")
+
+def prepare_firmware_bin(user_path):
+    # Expand ~ and resolve absolute path
+    user_path = os.path.expanduser(user_path)
+    if not os.path.isfile(user_path):
+        print(f"Error: File does not exist: {user_path}")
+        return None
+
+    basename = os.path.basename(user_path)
+    if not basename.lower().endswith('.bin'):
+        print("Error: Firmware file must have a .bin extension.")
+        return None
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    dest_path = os.path.join(script_dir, basename)
+
+    if os.path.isfile(dest_path):
+        print(f"Firmware file already present at: {dest_path}")
+        return basename  # Ready for HTTP server
+
+    try:
+        shutil.copy2(user_path, dest_path)
+        print(f"Firmware file copied to: {dest_path}")
+        return basename  # What the HTTP server expects
+    except Exception as e:
+        print(f"Error copying firmware file: {e}")
+        return None
 
 def main():
     parser = argparse.ArgumentParser(description="Sengled Local Control Tool", formatter_class=argparse.RawTextHelpFormatter)
@@ -705,10 +777,24 @@ def main():
     control_group.add_argument("--topic", help="Custom MQTT topic to publish to.")
     control_group.add_argument("--payload", help="Custom payload to send (raw string, not JSON).")
 
+    parser.add_argument("--run-http-server", action="store_true", help="Run the fake Sengled local HTTP server only (for firmware update testing).")
+    parser.add_argument("--http-port", type=int, default=80, help="HTTP server port (default: 80, falls back to 8080 if unavailable).")
+
     args = parser.parse_args()
     # Resolve broker IP: use provided value or fall back to local IP
     resolved_broker_ip = args.broker_ip or get_local_ip()
     tool = SengledTool()
+
+    if args.run_http_server:
+        startFakeHTTPServer()
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\nStopping HTTP server...")
+            server.stop()
+            print("Server stopped.")
+        return
 
     # Handle UDP commands first (they take precedence)
     if args.ip:
@@ -729,8 +815,8 @@ def main():
                 r, g, b = args.udp_color
                 r, g, b = int(r), int(g), int(b)
                 if all(0 <= val <= 255 for val in [r, g, b]):
-                    color_dec = f"{r:d}:{g:d}:{b:d}"
-                    payload = {"func": "set_device_color", "param": {"color": color_dec}}
+                    color_hex = f"{int(r):02X}{int(g):02X}{int(b):02X}"
+                    payload = {"func": "set_device_color", "param": {"color": color_hex}}
                     send_udp_command(args.ip, payload)
                 else:
                     print("Error: Color values must be between 0 and 255")
@@ -738,6 +824,7 @@ def main():
                 print(f"Error: Could not convert input to integer for --udp-color: {args.udp_color}. Exception: {ve}")
             except TypeError as te:
                     print(f"TypeError: Bad type in color arguments {args.udp_color}: {te}")
+
         elif args.udp_json:
             try:
                 custom = json.loads(args.udp_json)
@@ -892,16 +979,16 @@ def main():
                     print(f"TypeError: Bad type in color arguments {args.color}: {te}")
 
             elif args.color_temp is not None:
-                if 2700 <= args.color_temp <= 6500:
+                if 0 <= args.color_temp <= 100:
                     ts = get_current_epoch_ms()
                     # This command is a list of two actions
                     commands = [
                         {"dn": args.mac, "type": "colorTemperature", "value": str(args.color_temp), "time": ts},
-                        {"dn": args.mac, "type": "switch", "value": "1", "time": ts}
+                        {"dn": args.mac, "type": "switch", "value": "1", "time": ts},
                     ]
                     send_update_command(client, args.mac, commands)
                 else:
-                    print("Error: Color temperature must be between 2700 and 6500K")
+                    print("Error: Color temperature must be between 0 (2700K) and 100 (6500K)")
 
             elif args.color_mode is not None:
                 ts = get_current_epoch_ms()
@@ -912,6 +999,69 @@ def main():
                 ts = get_current_epoch_ms()
                 command = [{"dn": args.mac, "type": "effectStatus", "value": str(args.effect_status), "time": ts}]
                 send_update_command(client, args.mac, command)
+
+            elif args.upgrade:
+                # 1) Stern safety warning
+                print("=" * 72)
+                print("WARNING: Firmware upgrades are DANGEROUS!")
+                print("The file you specify MUST exist and MUST be a compatible ESP RTOS SDK")
+                print("application image designed for the 'ota_1' slot at Flash address 0x110000.")
+                print("Uploading a standard ESP8266 firmware will likely brick your bulb!")
+                print("That is to say, if you upload tasmota.bin here, your bulb will be bricked.")
+                print("Use ONLY tested shim images or official Sengled firmware.")
+                print("=" * 72)
+                input("Press Enter if you are sure, or Ctrl+C to cancel...")
+                # 2) Accept file path, not URL
+                firmware_path = os.path.expanduser(args.upgrade)
+                # 3) Validate file existence
+                if not os.path.isfile(firmware_path):
+                    print(f"Error: Firmware file '{firmware_path}' does not exist.")
+                    return
+                firmware_bin = prepare_firmware_bin(args.upgrade)
+                if not firmware_bin:
+                    return  # Abort if validation or copy fails
+                # 4) Set up HTTP server
+                preferred_http_port = int(os.environ.get("SENGLED_HTTP_PORT", "80") or 80)
+                upgrade_server = _SetupHTTPServer(mqtt_host=args.broker_ip or get_local_ip(), mqtt_port=args.mqtt_port or 1883 , preferred_port=preferred_http_port)
+
+                # Launch the HTTP server to serve the file
+                server_started = upgrade_server.start()
+
+                local_ip = get_local_ip()
+                http_port = str(upgrade_server.port)
+                firmware_filename = os.path.basename(firmware_path)
+                firmware_url = f"http://{local_ip}:{http_port}/{firmware_filename}"
+                print(f"Firmware will be served at: {firmware_url} - let's get that started.")
+
+                print("")
+                print("\"This is your last chance. After this, there is no turning back.")
+                print("You take the blue pill – the story ends, you wake up in your bed and")
+                print(" believe whatever you want to believe.")
+                print("You take the red pill – you stay in Wonderland, and I show you how deep")
+                print(" the rabbit hole goes.")
+                print("Remember, all I'm offering is the truth – nothing more.\"")
+                print("― Morpheus")
+                print("After upload, there is no going back to Sengled. THIS IS YOUR LAST CHANCE.")
+                input("Press Enter if you're ready to send the update, or Ctrl+C to cancel...")
+                # 5) Issue MQTT update command with URL
+                ts = get_current_epoch_ms()
+                command = [{"dn": args.mac, "type": "update", "value": firmware_url, "time": ts}]
+                send_update_command(client, args.mac, command)
+                print("Upgrade command sent! If you uploaded a standard shim, look for WiFi SSID")
+                print("called Sengled-Rescue. Connect to it, and browse to http://192.168.4.1 to")
+                print("finish uploading your third-party firmware.")
+                print("")
+                print("There's no going back now - your bulb only knows the shim firmware now.")
+                print("")
+                print("Press Ctrl+C after you see your firmware downloaded below, then your")
+                print("device should be running the uploaded code.")
+                try:
+                    while True:
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    print("\nStopping HTTP server...")
+                    upgrade_server.stop()
+                    print("Server stopped. Good luck!")
 
             elif args.status:
                 get_bulb_status(client, args.mac)
@@ -941,12 +1091,6 @@ def main():
                 ts = get_current_epoch_ms()
                 command = [{"dn": args.mac, "type": "info", "value": "", "time": ts}]
                 send_update_command(client, args.mac, command)
-
-            elif args.upgrade:
-                if not args.upgrade.startswith(('http://', 'https://')):
-                    print("Error: Firmware URL must start with http:// or https://")
-                    return
-                send_firmware_upgrade_command(client, args.mac, args.upgrade)
 
             else:
                 print("No command specified. Use --on, --off, --brightness, --color, --color-temp, --reset, or --status")
