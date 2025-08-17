@@ -170,7 +170,7 @@ Please keep changes dependency-free (no CDN/libs; device is offline on its own A
 ## Credits & license
 
 * **Author:** Matt Falcon (**FalconFour**)
-* **SengledTools** Python scripts: reddit.com/u/Skodd
+* **SengledTools** Python scripts: https://github.com/HamzaETTH/
 * Inspirations: `tuya-convert`, general OTA-shim patterns in the ESP community
 * Built on Espressif’s **ESP8266 RTOS SDK** and HTTP server (license: Apache 2.0, Espressif)
 
