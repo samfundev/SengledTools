@@ -1,0 +1,244 @@
+<!doctype html>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Sengled Rescue</title>
+<style>
+ body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;margin:24px;max-width:880px}
+ h1{margin:0 0 12px}
+ .row{margin:10px 0}
+ .bar{position:relative;display:flex;height:18px;border:1px solid #bbb;border-radius:9px;overflow:hidden}
+ .seg{height:100%; font-size:10px; line-height:18px; color:#000; text-align:center}
+ .s-boot{background:#dadada}
+ .s-nvs{background:#ffd699}
+ .s-ota{background:#cfe8ff}
+ .s-phy{background:#eee}
+ .overlay{position:absolute; top:0; height:100%; background:rgba(0,128,0,.25); border-left:1px dashed rgba(0,0,0,.35); border-right:1px dashed rgba(0,0,0,.35)}
+ .overlay.bad{background:rgba(220,0,0,.25)}
+ .pin{margin-top:4px;font-size:12px;color:#444}
+ .pin.ok  { color:#065f46; }  /* green-ish */
+ .pin.bad { color:#7f1d1d; }  /* red-ish */
+ svg text { font: 12px system-ui, Segoe UI, Roboto, Helvetica, Arial; }
+ svg .axis { stroke: #bbb; stroke-width: 2; }
+ svg .tick { stroke: #999; stroke-width: 1; }
+ svg .label-line { stroke: #999; stroke-width: 1; }
+ svg .label-text { fill: #000; }
+ svg .run-range { fill: rgba(50,50,50,.08); }
+ svg .probe-ok { fill: rgba(0,128,0,.25); }
+ svg .probe-bad { fill: rgba(220,0,0,.25); }
+ button{padding:.5rem 1rem}
+ progress{width:100%}
+ code{background:#f4f4f4;padding:2px 4px;border-radius:3px}
+ label{margin-right:8px}
+</style>
+<h1>Sengled Rescue</h1>
+<div class="row" id="mapwrap">
+  <svg id="map" width="100%" height="120" viewBox="0 0 1000 120"></svg>
+  <div class="pin" id="pin"></div>
+</div>
+<div class=row>
+ <label><input type=radio name=target value=boot checked> boot @ 0x000000</label>
+ <label><input type=radio name=target value=ota_0> ota_0</label>
+ <label><input type=radio name=target value=ota_1> ota_1</label>
+ <label><input type=radio name=target value=nvs> nvs</label>
+ <label><input type=radio name=target value=otadata> otadata</label>
+ <label><input type=radio name=target value=phy_init> phy_init</label>
+ <label><input type=radio name=target value=full> full (backup only)</label>
+</div>
+<div class=row>
+ <input id=file type=file accept=.bin>
+</div>
+<div class=row>
+ <button id=flash disabled>Flash selected</button>
+ <button id=bk>Backup selected</button>
+ <button id=relocate>Relocate to ota_1</button>
+ <button id=bootother>Boot other slot</button>
+</div>
+<div class=row><progress id=p value=0 max=100></progress></div>
+<pre id=log></pre>
+<footer style="text-align:center; font-size:0.9em; margin-top:2em; color:#666;">
+  SengledTools — Licensed under the MIT License.<br>
+  © 2025 Matt Falcon (with ChatGPT assistance, and apparently lawyers make us copyright this).<br>
+  Go ahead — use it, break it, fix it, share it.
+</footer>
+<script>
+const $=s=>document.querySelector(s);
+let state={}, blob=null, parts=[];
+
+async function fetchJSON(u){ const r=await fetch(u,{cache:'no-store'}); return r.json(); }
+
+function fmtHex(n){ return '0x' + n.toString(16).padStart(6,'0'); }
+
+function renderMapSVG(parts, info, probe, hasFile){
+  const svg = document.getElementById('map');
+  svg.innerHTML = '';
+
+  // normalize
+  const norm = parts.map(p => ({
+    label: p.label,
+    addr: typeof p.addr === 'string' ? parseInt(p.addr,16) : +p.addr,
+    size: +p.size
+  }));
+
+  const max = Math.max(...norm.map(p => p.addr + p.size));
+  const rows = norm.length, H = Math.max(140, 60 + rows*16), W = 1000;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('height', H);
+
+  const yAxis=30, yBase=40, labelY=55;
+  const x = v => Math.round(v / max * (W-40)) + 20;
+
+  // axis
+  const axis = document.createElementNS('http://www.w3.org/2000/svg','line');
+  axis.setAttribute('x1',20); axis.setAttribute('x2',W-20);
+  axis.setAttribute('y1',yAxis); axis.setAttribute('y2',yAxis);
+  axis.setAttribute('class','axis'); svg.appendChild(axis);
+
+  // running slot shaded
+  if (info && info.run_addr){
+    const runAddr = typeof info.run_addr==='string' ? parseInt(info.run_addr,16) : +info.run_addr;
+    const run = norm.find(p => p.addr === runAddr);
+    if (run){
+      const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      r.setAttribute('x', x(run.addr));
+      r.setAttribute('y', yAxis-8);
+      r.setAttribute('width', Math.max(1, x(run.addr+run.size)-x(run.addr)));
+      r.setAttribute('height', 16);
+      r.setAttribute('class','run-range');
+      svg.appendChild(r);
+    }
+  }
+
+  // precise write overlay (only when a file is selected)
+  let w0=null, w1=null;
+  if (hasFile && probe && probe.ok && (probe.wlen || probe.wend)){
+    w0 = typeof probe.base==='string' ? parseInt(probe.base,16) : +probe.base;
+    w1 = probe.wend
+          ? (typeof probe.wend==='string' ? parseInt(probe.wend,16) : +probe.wend)
+          : (w0 + (+probe.wlen));
+    const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    r.setAttribute('x', x(w0));
+    r.setAttribute('y', yAxis-12);
+    r.setAttribute('width', Math.max(1, x(w1)-x(w0)));
+    r.setAttribute('height', 24);
+    r.setAttribute('class', probe.overlap ? 'probe-bad' : 'probe-ok');
+    svg.appendChild(r);
+  }
+
+  // partitions (always draw, verbatim)
+  const sorted = [...norm].sort((a,b)=> b.addr - a.addr);
+  let dy = 0;
+  for (const p of sorted){
+    const tick = document.createElementNS('http://www.w3.org/2000/svg','line');
+    tick.setAttribute('x1', x(p.addr)); tick.setAttribute('y1', yAxis);
+    tick.setAttribute('x2', x(p.addr)); tick.setAttribute('y2', yBase + dy);
+    tick.setAttribute('class','label-line'); svg.appendChild(tick);
+
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x', x(p.addr)+4); t.setAttribute('y', labelY + dy);
+    t.setAttribute('class','label-text');
+    const end = p.addr + p.size;
+    t.textContent = `${p.label}  ${fmtHex(p.addr)}..${fmtHex(end)} (${p.size}B)`;
+    svg.appendChild(t);
+
+    dy += 16;
+  }
+}
+
+function updateWriteBanner(){
+  const pin = $('#pin');
+  if (!blob || !state.probe){ pin.className='pin'; pin.textContent=''; return; }
+  const ok = !!state.probe.ok;
+  const base = typeof state.probe.base==='string' ? parseInt(state.probe.base,16) : +state.probe.base;
+  const end  = state.probe.wend
+                 ? (typeof state.probe.wend==='string' ? parseInt(state.probe.wend,16) : +state.probe.wend)
+                 : (base + (+state.probe.wlen||0));
+  const tgt = document.querySelector('input[name=target]:checked').value;
+  pin.className = 'pin ' + (ok ? 'ok' : 'bad');
+  pin.textContent = ok
+    ? `write: ${blob.name} ${fmtHex(base)}..${fmtHex(end)} (${end-base}B) → ${tgt}`
+    : `write blocked${state.probe.overlap ? ' (overlaps running slot)' : ''}`;
+}
+
+function renderBar(){
+  const hasFile = !!blob;
+  renderMapSVG(parts, state.info, state.probe, hasFile);
+}
+
+async function refresh(){
+  const m = await fetchJSON('/map');
+  // normalize numeric fields once
+  parts = m.map(p=>({ label:p.label,
+                      addr: typeof p.addr==='string'? parseInt(p.addr,16): +p.addr,
+                      size: +p.size }));
+  state.info = await fetchJSON('/info');
+  await probeTarget();
+  renderBar();
+  updateWriteBanner();
+  $('#pin').textContent = `running=${state.info.running} @ ${state.info.run_addr} | boot=${state.info.boot} | safe_to_flash=${state.info.safe_to_flash}`;
+  const tgt = $('input[name=target]:checked').value;
+  const flashable = blob && tgt!=='full' && state.probe && state.probe.ok && !state.probe.overlap;
+  $('#flash').disabled = !flashable;
+}
+
+async function probeTarget(){
+  const tgt=$('input[name=target]:checked').value;
+  let url = '/probe?target=' + encodeURIComponent(tgt);
+  if (blob && tgt !== 'full') url += '&len=' + blob.size;
+  state.probe = await fetchJSON(url);
+}
+
+$('#file').onchange=async()=>{
+  blob = $('#file').files[0] || null;
+  const tgt=$('input[name=target]:checked').value;
+  await probeTarget(); // picks up new blob.size in &len
+  renderBar();
+  updateWriteBanner();
+  if (blob && state.probe && state.probe.ok){
+    const base = (typeof state.probe.base==='string'? parseInt(state.probe.base,16): +state.probe.base);
+    const end  = base + blob.size;
+    $('#log').textContent = `Selected ${blob.name} (${blob.size} B). Will flash to ${tgt} at ${fmtHex(base)}..${fmtHex(end)}`;
+  } else {
+    $('#log').textContent = '';
+  }
+  const flashable = blob && tgt!=='full' && state.probe && state.probe.ok && !state.probe.overlap;
+  $('#flash').disabled = !flashable;
+};
+for (const r of document.querySelectorAll('input[name=target]')) r.onchange=refresh;
+
+async function doFlash(){
+  const tgt=$('input[name=target]:checked').value; if(!blob||tgt==='full') return;
+  const base = (typeof state.probe.base==='string'? parseInt(state.probe.base,16): +state.probe.base);
+  const end  = base + blob.size;
+  const xhr=new XMLHttpRequest(); $('#p').value=0; $('#log').textContent=`Flashing ${blob.name} (${blob.size} B) to ${tgt} at ${fmtHex(base)}..${fmtHex(end)}…`;
+  xhr.open('POST','/flash?target='+encodeURIComponent(tgt),true);
+  xhr.setRequestHeader('Content-Type','application/octet-stream');
+  xhr.upload.onprogress=e=>{ if(e.lengthComputable) $('#p').value=Math.floor(e.loaded*100/e.total); };
+  xhr.onload=()=>{ $('#log').textContent = `${xhr.status}: ${xhr.responseText}`; setTimeout(waitUp,700); };
+  xhr.onerror=()=>{ $('#log').textContent='Upload error (likely reboot)…'; setTimeout(waitUp,700); };
+  xhr.send(blob);
+}
+
+async function postAndLog(url, label){
+  $('#log').textContent=label+': working…';
+  try { const r=await fetch(url,{method:'POST'}); $('#log').textContent=label+': '+r.status+' '+r.statusText; }
+  catch(e){ $('#log').textContent=label+': connection dropped (rebooting?)'; }
+  setTimeout(waitUp, 800);
+}
+
+async function doBackup(){
+  const tgt=$('input[name=target]:checked').value;
+  $('#log').textContent=tgt+': Backup started... watch for a download to appear';
+  location.href = '/backup?label='+encodeURIComponent(tgt);
+}
+
+async function waitUp(){
+  for(;;){ try{ const r=await fetch('/info',{cache:'no-store'}); if(r.ok){ $('#log').textContent+='\nBack up.'; break; } }catch(e){} await new Promise(r=>setTimeout(r,800)); }
+  refresh();
+}
+
+$('#flash').onclick=doFlash;
+$('#bk').onclick=doBackup;
+$('#relocate').onclick=()=>postAndLog('/relocate','relocate');
+$('#bootother').onclick=()=>postAndLog('/bootswitch','bootswitch');
+
+refresh(); setInterval(refresh, 10000);
+</script>

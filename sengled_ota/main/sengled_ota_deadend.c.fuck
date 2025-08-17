@@ -1,0 +1,185 @@
+// app_main.c — ESP8266 RTOS SDK (v3.x) style
+#include <string.h>
+#include "esp_system.h"
+#include "esp_event_loop.h"
+#include "esp_log.h"
+#include "esp_ota_ops.h"
+#include "nvs_flash.h"
+#include "nvs.h"
+#include "tcpip_adapter.h"
+#include "esp_wifi.h"
+#include "esp_partition.h"
+
+static const char *TAG = "installer";
+
+static esp_err_t event_handler(void *ctx, system_event_t *event)
+{
+    switch (event->event_id) {
+    case SYSTEM_EVENT_STA_START:
+        ESP_LOGI(TAG, "STA started, connecting…");
+        esp_wifi_connect();
+        break;
+    case SYSTEM_EVENT_STA_GOT_IP:
+        ESP_LOGI(TAG, "GOT IP: " IPSTR,
+                 IP2STR(&event->event_info.got_ip.ip_info.ip));
+        break;
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+        ESP_LOGW(TAG, "STA disconnected, reason=%d — retrying",
+                 event->event_info.disconnected.reason);
+        esp_wifi_connect();
+        break;
+    default:
+        break;
+    }
+    return ESP_OK;
+}
+
+static void print_partition_where_running(void)
+{
+    const esp_partition_t *run = esp_ota_get_running_partition();
+    const esp_partition_t *boot = esp_ota_get_boot_partition();
+    if (run)  ESP_LOGI(TAG, "Running from %s @ 0x%06x (%uK)",
+                       run->label, run->address, (unsigned)run->size/1024);
+    if (boot) ESP_LOGI(TAG, "Boot partition %s @ 0x%06x",
+                       boot->label, boot->address);
+}
+
+static void init_nvs_wifi(void) {
+    esp_err_t rc = nvs_flash_init();
+    if (rc == ESP_ERR_NVS_NO_FREE_PAGES || rc == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        // not strictly needed, but good hygiene if you ever re-use NVS
+        // actually we're gonna NOT do this for now haha
+        //nvs_flash_erase(); 
+        //rc = nvs_flash_init();
+    }
+    ESP_LOGI(TAG, "nvs_flash_init -> %s", esp_err_to_name(rc));
+
+    tcpip_adapter_init();
+    esp_event_loop_init(event_handler, NULL);
+
+    wifi_init_config_t wic = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&wic));
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_start());  // <-- important: populate driver cfg from FLASH
+}
+
+static void try_read_sta_cfg(void) {
+    wifi_config_t sta = {0};
+    esp_err_t rc = esp_wifi_get_config(WIFI_IF_STA, &sta);
+    ESP_LOGI(TAG, "esp_wifi_get_config -> %s", esp_err_to_name(rc));
+    ESP_LOGI(TAG, "STA SSID='%s' (len=%d) PW len=%d",
+             (char*)sta.sta.ssid,
+             (int)strnlen((char*)sta.sta.ssid, sizeof(sta.sta.ssid)),
+             (int)strnlen((char*)sta.sta.password, sizeof(sta.sta.password)));
+}
+
+static void hexdump(const uint8_t *p, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        if ((i % 16) == 0) printf("\n%06x: ", (int)i);
+        printf("%02x ", p[i]);
+    }
+    printf("\n");
+}
+
+static void dump_nvs_all(void) {
+    const char *part = "nvs";  // your table shows label "nvs" @0x9000
+    nvs_iterator_t it = nvs_entry_find(part, NULL, NVS_TYPE_ANY);
+    while (it) {
+        nvs_entry_info_t info;
+        nvs_entry_info(it, &info); // fills namespace_name, key, type
+        ESP_LOGI(TAG, "NVS ns='%s' key='%s' type=%d", info.namespace_name, info.key, info.type);
+
+        // open the namespace and try to read
+        nvs_handle h;
+        if (nvs_open_from_partition(part, info.namespace_name, NVS_READONLY, &h) == ESP_OK) {
+            if (info.type == NVS_TYPE_STR) {
+                size_t len = 0;
+                if (nvs_get_str(h, info.key, NULL, &len) == ESP_OK && len > 0 && len < 256) {
+                    char *buf = malloc(len);
+                    if (buf && nvs_get_str(h, info.key, buf, &len) == ESP_OK) {
+                        ESP_LOGI(TAG, "  STR: \"%s\"", buf);
+                    }
+                    free(buf);
+                }
+            } else if (info.type == NVS_TYPE_BLOB) {
+                size_t len = 0;
+                if (nvs_get_blob(h, info.key, NULL, &len) == ESP_OK && len && len < 512) {
+                    uint8_t *buf = malloc(len);
+                    if (buf && nvs_get_blob(h, info.key, buf, &len) == ESP_OK) {
+                        ESP_LOGI(TAG, "  BLOB (%u bytes)", (unsigned)len);
+                        hexdump(buf, len);
+                    }
+                    free(buf);
+                }
+            } else if (info.type == NVS_TYPE_U8 || info.type == NVS_TYPE_U16 || info.type == NVS_TYPE_U32) {
+                uint32_t v=0; nvs_get_u32(h, info.key, &v);
+                ESP_LOGI(TAG, "  U32: 0x%08x", v);
+            }
+            nvs_close(h);
+        }
+
+        it = nvs_entry_next(it);      // advance (returns next iterator)
+    }
+    // No need to nvs_release_iterator(NULL); but safe if you kept the last non-NULL around.
+}
+
+
+void app_main(void)
+{
+//    // Avoid rollback to ota_0 if bootloader supports rollback
+//    esp_err_t r = esp_ota_mark_app_valid_cancel_rollback();
+//    ESP_LOGI(TAG, "mark_app_valid: %s", (r == ESP_OK) ? "OK" : "N/A");
+
+    ESP_LOGI(TAG, "Hello fucking World!");
+    print_partition_where_running();
+
+    ESP_LOGI(TAG, "We're gonna go check config... fingers crossed");
+    init_nvs_wifi();
+    try_read_sta_cfg();
+
+    dump_nvs_all();
+
+/* old shit
+    // Bring up NVS/Wi-Fi
+    nvs_flash_init();
+    tcpip_adapter_init();
+    esp_event_loop_init(event_handler, NULL);
+
+    wifi_init_config_t wic = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&wic));
+
+    // Use FLASH as storage so we read/write persistent creds
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
+
+    // See if creds exist
+    wifi_config_t sta_cfg = {0};
+    esp_wifi_get_config(WIFI_IF_STA, &sta_cfg);
+
+    dump_nvs();
+
+    if (sta_cfg.sta.ssid[0] != 0) {
+        ESP_LOGI(TAG, "Found stored STA creds: SSID=\"%s\" (pw len=%d)",
+                 (char*)sta_cfg.sta.ssid,
+                 (int)strnlen((char*)sta_cfg.sta.password, sizeof(sta_cfg.sta.password)));
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &sta_cfg));
+        ESP_ERROR_CHECK(esp_wifi_start());
+        // connect happens in SYSTEM_EVENT_STA_START
+    } else {
+        // Fallback AP so we have a management UI path later
+        wifi_config_t ap = {0};
+        strcpy((char*)ap.ap.ssid, "Sengled-Rescue");
+        ap.ap.ssid_len = strlen((char*)ap.ap.ssid);
+        ap.ap.channel = 1;
+        ap.ap.max_connection = 4;
+        ap.ap.authmode = WIFI_AUTH_OPEN;
+
+        ESP_LOGW(TAG, "No stored STA creds — starting fallback AP \"%s\"",
+                 (char*)ap.ap.ssid);
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap));
+        ESP_ERROR_CHECK(esp_wifi_start());
+    }
+*/
+}
