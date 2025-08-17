@@ -55,9 +55,9 @@
 <div class=row><progress id=p value=0 max=100></progress></div>
 <pre id=log></pre>
 <footer style="text-align:center; font-size:0.9em; margin-top:2em; color:#666;">
-  SengledTools — Licensed under the MIT License.<br>
-  © 2025 Matt Falcon (with ChatGPT assistance, and apparently lawyers make us copyright this).<br>
-  Go ahead — use it, break it, fix it, share it.
+  SengledTools - Licensed under the MIT License.<br>
+  (c) 2025 Matt Falcon (with ChatGPT assistance, and apparently lawyers make us copyright this).<br>
+  Go ahead - use it, break it, fix it, share it.
 </footer>
 <script>
 const $=s=>document.querySelector(s);
@@ -154,7 +154,7 @@ function updateWriteBanner(){
   const tgt = document.querySelector('input[name=target]:checked').value;
   pin.className = 'pin ' + (ok ? 'ok' : 'bad');
   pin.textContent = ok
-    ? `write: ${blob.name} ${fmtHex(base)}..${fmtHex(end)} (${end-base}B) → ${tgt}`
+    ? `write: ${blob.name} ${fmtHex(base)}..${fmtHex(end)} (${end-base}B) to ${tgt}`
     : `write blocked${state.probe.overlap ? ' (overlaps running slot)' : ''}`;
 }
 
