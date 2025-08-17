@@ -51,6 +51,23 @@ graph TD
     style G fill:#d1c4e9,stroke:#512da8,stroke-width:2px
 ```
 
+## Upgrading to Open Source Firmware
+
+It is now possible to reflash Sengled bulbs (at least the W31-N15 has been tested, which uses the Sengled WF863 module, itself containing an ESP8266EX chip) with open firmware such as [Tasmota](https://tasmota.github.io/) (tested) and ESPHome (untested). The process to download an arbitrary firmware involves using a "shim" app known as Sengled-Rescue, which is located in the `sengled-ota` folder of the project. A compiled version of Sengled-Rescue is located in `shim.bin` of the main project.
+
+Once you set up the workflow for one bulb, flashing additional bulbs should become a 5-minute job.
+
+To flash firmware, you first need to reach "Phase 2" in MQTT mode above. **You need to be able to send MQTT commands through your broker using sengled_tool.py**. Once you are able to send on/off commands, you can send the `--upgrade shim.bin` command to reflash Sengled-Rescue and begin that workflow.
+
+```
+python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --upgrade "shim.bin"
+[        ^-- This part comes from your successful WiFi setup -- ^      ] [^- Upgrade command]
+```
+
+Once you have flashed shim.bin successfully, you will see a "Sengled-Rescue" WiFi SSID on your network. Connect to it and open http://192.168.4.1 in your browser. From there, you will see whether it landed in "ota_0" (bad, cannot flash) or "ota_1" (good, can flash up to 1MB). Though the Flash chip in the bulb (WF863 module) is 2MB, the firmware you upload cannot "clobber" the running software (in ota_1) which begins a bit past 1MB - thus the size limitation. Uploading a firmware *.bin to "boot" completely transforms the software of the bulb, making it a basic/generic ESP8266 device.
+
+After you've flashed your software, the bulb is now a standard ESP8266EX device, for all intents and purposes.
+
 ## Prerequisites
 
 * Install Python 3.10+ and dependencies:
