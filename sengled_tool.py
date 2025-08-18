@@ -11,6 +11,7 @@ import sys
 import shutil
 import time
 import socket
+from urllib.parse import urlparse
 import warnings
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -101,7 +102,10 @@ class _SetupHTTPServer:
                 length = int(self.headers.get("Content-Length", 0) or 0)
                 _ = self.rfile.read(length) if length > 0 else b""
 
-                if self.path == "/life2/device/accessCloud.json":
+                print(f"DEBUG: Received PUT request on {self.path} from {self.client_address[0]}")
+                parsed_url = urlparse(self.path)
+
+                if parsed_url.path == "/life2/device/accessCloud.json":
                     outer.last_client_ip = self.client_address[0]
                     outer._hit_access_cloud.set()
                     self._send_json({
@@ -112,7 +116,7 @@ class _SetupHTTPServer:
                     })
                     return
 
-                if self.path == "/jbalancer/new/bimqtt":
+                if parsed_url.path == "/jbalancer/new/bimqtt":
                     outer.last_client_ip = self.client_address[0]
                     outer._hit_bimqtt.set()
                     self._send_json({
@@ -125,8 +129,11 @@ class _SetupHTTPServer:
                 self.send_error(404, "Not Found")
 
             def do_GET(self):  # noqa: N802 (stdlib signature)
+                print(f"DEBUG: Received GET request on {self.path} from {self.client_address[0]}")
+                parsed_url = urlparse(self.path)
+
                 # Treat GET the same for robustness
-                if self.path == "/life2/device/accessCloud.json":
+                if parsed_url.path == "/life2/device/accessCloud.json":
                     outer.last_client_ip = self.client_address[0]
                     outer._hit_access_cloud.set()
                     self._send_json({
@@ -137,7 +144,7 @@ class _SetupHTTPServer:
                     })
                     return
 
-                if self.path == "/jbalancer/new/bimqtt":
+                if parsed_url.path == "/jbalancer/new/bimqtt":
                     outer.last_client_ip = self.client_address[0]
                     outer._hit_bimqtt.set()
                     self._send_json({
@@ -147,11 +154,11 @@ class _SetupHTTPServer:
                     })
                     return
                 # Firmware download handler
-                if self.path.endswith(".bin"):
-                    requested = os.path.basename(self.path)
+                if parsed_url.path.endswith(".bin"):
+                    requested = os.path.basename(parsed_url.path)
                     # Only allow direct root requests, not any path structure
-                    if "/" in self.path.strip("/").replace(requested, ""):
-                        print(f"❌ Refused firmware download with path component: {self.path}")
+                    if "/" in parsed_url.path.strip("/").replace(requested, ""):
+                        print(f"❌ Refused firmware download with path component: {parsed_url.path}")
                         self.send_error(400, "Invalid firmware path")
                         return
                     # Prevent dangerous names and empty
