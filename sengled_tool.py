@@ -11,6 +11,7 @@ import sys
 import shutil
 import time
 import socket
+from urllib.parse import urlparse
 import warnings
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -102,7 +103,10 @@ class _SetupHTTPServer:
                 length = int(self.headers.get("Content-Length", 0) or 0)
                 _ = self.rfile.read(length) if length > 0 else b""
 
-                if self.path == "/life2/device/accessCloud.json":
+                print(f"DEBUG: Received PUT request on {self.path} from {self.client_address[0]}")
+                parsed_url = urlparse(self.path)
+
+                if parsed_url.path == "/life2/device/accessCloud.json":
                     outer.last_client_ip = self.client_address[0]
                     outer._hit_access_cloud.set()
                     self._send_json({
@@ -113,7 +117,7 @@ class _SetupHTTPServer:
                     })
                     return
 
-                if self.path == "/jbalancer/new/bimqtt":
+                if parsed_url.path == "/jbalancer/new/bimqtt":
                     outer.last_client_ip = self.client_address[0]
                     outer._hit_bimqtt.set()
                     self._send_json({
@@ -126,8 +130,11 @@ class _SetupHTTPServer:
                 self.send_error(404, "Not Found")
 
             def do_GET(self):  # noqa: N802 (stdlib signature)
+                print(f"DEBUG: Received GET request on {self.path} from {self.client_address[0]}")
+                parsed_url = urlparse(self.path)
+
                 # Treat GET the same for robustness
-                if self.path == "/life2/device/accessCloud.json":
+                if parsed_url.path == "/life2/device/accessCloud.json":
                     outer.last_client_ip = self.client_address[0]
                     outer._hit_access_cloud.set()
                     self._send_json({
@@ -138,7 +145,7 @@ class _SetupHTTPServer:
                     })
                     return
 
-                if self.path == "/jbalancer/new/bimqtt":
+                if parsed_url.path == "/jbalancer/new/bimqtt":
                     outer.last_client_ip = self.client_address[0]
                     outer._hit_bimqtt.set()
                     self._send_json({
@@ -148,11 +155,11 @@ class _SetupHTTPServer:
                     })
                     return
                 # Firmware download handler
-                if self.path.endswith(".bin"):
-                    requested = os.path.basename(self.path)
+                if parsed_url.path.endswith(".bin"):
+                    requested = os.path.basename(parsed_url.path)
                     # Only allow direct root requests, not any path structure
-                    if "/" in self.path.strip("/").replace(requested, ""):
-                        print(f"❌ Refused firmware download with path component: {self.path}")
+                    if "/" in parsed_url.path.strip("/").replace(requested, ""):
+                        print(f"❌ Refused firmware download with path component: {parsed_url.path}")
                         self.send_error(400, "Invalid firmware path")
                         return
                     # Prevent dangerous names and empty
@@ -420,9 +427,10 @@ def get_bulb_status(client: MQTTClient, mac_address: str):
     print("Timeout: No status response from the bulb. Please ensure the bulb is online and connected to the broker.")
     return None
 
-class SengledTool:
-    def __init__(self):
+class SengledTool():
+    def __init__(self, args):
         self.wifi_crypto = SengledWiFiCrypto()
+        self.args = args
 
     def _perform_wifi_setup(
         self, broker_ip: str, broker_port: int, wifi_ssid: str, wifi_pass: str, wifi_bssid: str = None,
@@ -468,6 +476,11 @@ class SengledTool:
                 s.sendto(json.dumps(start_req).encode('utf-8'), (BULB_IP, BULB_PORT))
                 data, _ = s.recvfrom(4096)
                 handshake_resp = json.loads(data.decode('utf-8'))
+
+                if "mac" not in handshake_resp["payload"] and self.args.mac:
+                    print("MAC address not provided by bulb, using command line option --mac")
+                    # set mac address from command line option --mac
+                    handshake_resp["payload"]["mac"] = self.args.mac
 
                 if "payload" not in handshake_resp or "mac" not in handshake_resp["payload"]:
                     bulb_mac = get_mac_address(ip=BULB_IP)
@@ -788,7 +801,7 @@ def main():
     args = parser.parse_args()
     # Resolve broker IP: use provided value or fall back to local IP
     resolved_broker_ip = args.broker_ip or get_local_ip()
-    tool = SengledTool()
+    tool = SengledTool(args)
 
     if args.run_http_server:
         startFakeHTTPServer()
