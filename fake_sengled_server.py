@@ -5,6 +5,7 @@ Simulates the Sengled cloud endpoints for local testing.
 """
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse
 import json
 import logging
 import argparse
@@ -29,7 +30,9 @@ class SengledRequestHandler(BaseHTTPRequestHandler):
         logging.info(f"🌐 POST {self.path} from {client_ip}")
         logging.info(f"📦 Request Body: {post_data}")
         
-        if self.path == "/jbalancer/new/bimqtt":
+        parsed_url = urlparse(self.path)
+
+        if  parsed_url.path == "/jbalancer/new/bimqtt":
             response = {
                 "protocal": "mqtt",
                 "host": BROKER_HOST,
@@ -38,7 +41,7 @@ class SengledRequestHandler(BaseHTTPRequestHandler):
             logging.info(f"📤 Response: {json.dumps(response, indent=2)}")
             self._send_json_response(response)
             
-        elif self.path == "/life2/device/accessCloud.json":
+        elif parsed_url.path == "/life2/device/accessCloud.json":
             try:
                 request_data = json.loads(post_data)
                 device_uuid = request_data.get("deviceUuid", "")
@@ -63,7 +66,9 @@ class SengledRequestHandler(BaseHTTPRequestHandler):
         client_ip = self.client_address[0]
         logging.info(f"🌐 GET {self.path} from {client_ip}")
         
-        if self.path == "/jbalancer/new/bimqtt":
+        parsed_url = urlparse(self.path)
+
+        if parsed_url.path == "/jbalancer/new/bimqtt":
             response = {
                 "protocal": "mqtt",
                 "host": BROKER_HOST,
