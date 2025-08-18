@@ -476,6 +476,7 @@ class SengledTool:
                 
                 if len(bulb_mac) != 17: #length of a valid Mac Address
                     print(f"Connection failed: {handshake_resp}", file=sys.stderr)
+                    return
 
                 Console.ok(f"Connected to bulb. MAC: {bulb_mac}")
 
