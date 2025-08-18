@@ -15,6 +15,7 @@ import warnings
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Optional
+from getmac import get_mac_address
 
 # Suppress SSL and certificate warnings
 warnings.filterwarnings("ignore", message=".*SSL.*", category=Warning)
@@ -469,10 +470,14 @@ class SengledTool:
                 handshake_resp = json.loads(data.decode('utf-8'))
 
                 if "payload" not in handshake_resp or "mac" not in handshake_resp["payload"]:
+                    bulb_mac = get_mac_address(ip=BULB_IP)
+                else:
+                    bulb_mac = handshake_resp["payload"]["mac"]
+                
+                if len(bulb_mac) != 17: #length of a valid Mac Address
                     print(f"Connection failed: {handshake_resp}", file=sys.stderr)
                     return
 
-                bulb_mac = handshake_resp["payload"]["mac"]
                 Console.ok(f"Connected to bulb. MAC: {bulb_mac}")
 
                 if interactive:
