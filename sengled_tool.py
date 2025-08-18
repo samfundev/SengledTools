@@ -419,9 +419,10 @@ def get_bulb_status(client: MQTTClient, mac_address: str):
     print("Timeout: No status response from the bulb. Please ensure the bulb is online and connected to the broker.")
     return None
 
-class SengledTool:
-    def __init__(self):
+class SengledTool():
+    def __init__(self, args):
         self.wifi_crypto = SengledWiFiCrypto()
+        self.args = args
 
     def _perform_wifi_setup(
         self, broker_ip: str, broker_port: int, wifi_ssid: str, wifi_pass: str, wifi_bssid: str = None,
@@ -468,11 +469,17 @@ class SengledTool:
                 data, _ = s.recvfrom(4096)
                 handshake_resp = json.loads(data.decode('utf-8'))
 
+                if "mac" not in handshake_resp["payload"] and self.args.mac:
+                    print("MAC address not provided by bulb, using command line option --mac")
+                    # set mac address from command line option --mac
+                    handshake_resp["payload"]["mac"] = self.args.mac
+
                 if "payload" not in handshake_resp or "mac" not in handshake_resp["payload"]:
                     print(f"Connection failed: {handshake_resp}", file=sys.stderr)
                     return
 
                 bulb_mac = handshake_resp["payload"]["mac"]
+
                 Console.ok(f"Connected to bulb. MAC: {bulb_mac}")
 
                 if interactive:
@@ -783,7 +790,7 @@ def main():
     args = parser.parse_args()
     # Resolve broker IP: use provided value or fall back to local IP
     resolved_broker_ip = args.broker_ip or get_local_ip()
-    tool = SengledTool()
+    tool = SengledTool(args)
 
     if args.run_http_server:
         startFakeHTTPServer()
