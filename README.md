@@ -4,6 +4,16 @@ A small reverse‑engineering and local‑control toolkit for Sengled Wi‑Fi bu
 
 A comprehensive tool for local control and protocol research of Sengled Wi‑Fi bulbs. It can pair bulbs to your own MQTT broker (no cloud), provides UDP control, and optionally publishes a firmware URL for advanced users (e.g., Tasmota/ESPHome) for testing on your own devices.
 
+> [!IMPORTANT]
+> This code base is based on testing with a **W31-N15** bulb, which uses Sengled's WF863 module (based on ESP8266EX). **Other bulbs appear to use other modules** (like WF864, based on MX1290 chip), which may not work with this system. We're working on acquiring other bulbs to test/develop with them and will add to this list.
+>
+> Currently known working bulbs ✅
+> * W31-N15 (WiFi multi-color LED) - WF863 Module / Espressif ESP8266EX chip
+>
+> Currently known NON-working bulbs ❌
+> * W12-N15 (WiFi white LED) - WF864 module / MXCHIP MX1290 chip
+> * W21-N13 and W11-N13 (WiFi multi-color LED) - MXCHIP EMW3091 module / unknown chip
+
 ## Quick usage (current flow)
 
 For a fuller, step‑by‑step guide, see [Instructions](INSTRUCTIONS.md).
