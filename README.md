@@ -13,6 +13,8 @@ A comprehensive tool for local control and protocol research of Sengled Wi‑Fi 
 > Currently known NON-working bulbs ❌
 > * W12-N15 (WiFi white LED) - WF864 module / MXCHIP MX1290 chip
 > * W21-N13 and W11-N13 (WiFi multi-color LED) - MXCHIP EMW3091 module / unknown chip
+>
+> Check the side of your bulb for FCC ID - it contains the ID of the module (or chip) used inside the bulb, matching one of the above. Post an issue if you find a bulb using a supported module that's not listed!
 
 ## Quick usage (current flow)
 
