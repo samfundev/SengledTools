@@ -2,8 +2,10 @@
 
 ## Quick Navigation
 
-- **[Setup & Configuration](#setup--configuration)** - Initial setup and configuration steps
 - **[Jailbreaking & WiFi Setup (Breaking Cloud Dependency)](#jailbreaking--wifi-setup-breaking-cloud-dependency)** - Flash custom firmware and break cloud dependency
+- **[Setup & Configuration](#setup--configuration)** - Initial setup and configuration steps
+- **[Basic Control](#basic-control)** - Common control commands and usage
+- **[Troubleshooting](#troubleshooting)** - Common issues and solutions
 
 ## Setup & Control Flow
 
@@ -163,7 +165,7 @@ If ports 80/8080 are busy, the tool assumes you run your own HTTP server and wil
 ## Basic Control
 
 <details>
-<summary><strong>MQTT Control</strong> - [MQTT_COMMANDS_REFERENCE.md](references/MQTT_COMMANDS_REFERENCE.md)</summary>
+<summary><strong>MQTT Control</strong></summary>
 
 ```bash
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --on
@@ -171,12 +173,14 @@ python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --off
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --brightness 50
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --color 255 0 0
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --color-temp 65
+
 ```
 
+[📋 See full MQTT command reference for more details](references/MQTT_COMMANDS_REFERENCE.md)
 </details>
 
 <details>
-<summary><strong>UDP Control</strong> - [UDP_COMMANDS_REFERENCE.md](references/UDP_COMMANDS_REFERENCE.md)</summary>
+<summary><strong>UDP Control</strong></summary>
 
 ```bash
 python sengled_tool.py --ip 192.168.0.247 --udp-on
@@ -184,6 +188,7 @@ python sengled_tool.py --ip 192.168.0.247 --udp-off
 python sengled_tool.py --ip 192.168.0.247 --udp-brightness 50
 ```
 
+[📋 See full UDP command reference for more details](references/UDP_COMMANDS_REFERENCE.md)
 </details>
 
 ## Troubleshooting
