@@ -1,5 +1,10 @@
 # Instructions
 
+## Quick Navigation
+
+- **[Setup & Configuration](#setup--configuration)** - Initial setup and configuration steps
+- **[Jailbreaking & WiFi Setup (Breaking Cloud Dependency)](#jailbreaking--wifi-setup-breaking-cloud-dependency)** - Flash custom firmware and break cloud dependency
+
 ## Setup & Control Flow
 
 ```mermaid
@@ -45,42 +50,6 @@ graph TD
 
     style G fill:#d1c4e9,stroke:#512da8,stroke-width:2px
 ```
-
-## Jailbreaking & WiFi Setup (Breaking Cloud Dependency)
-
-It is now possible to reflash Sengled bulbs (at least the W31-N15 and W31-N11 have been tested, which use the Sengled WF863 module, itself containing an ESP8266EX chip) with open firmware such as [Tasmota](https://tasmota.github.io/) (tested) and ESPHome (untested). The process to download an arbitrary firmware involves using a "shim" app known as Sengled-Rescue, which is located in the `sengled-ota` folder of the project. A compiled version of Sengled-Rescue is located in `shim.bin` of the main project.
-
-Once you set up the workflow for one bulb, flashing additional bulbs should become a 5-minute job.
-
-To flash firmware, you first need to reach "Phase 2" in MQTT mode above (follow guide below). **You need to be able to send MQTT commands through your broker using sengled_tool.py**. Once you are able to send on/off commands, you can send the `--upgrade shim.bin` command to reflash Sengled-Rescue and begin that workflow.
-
-```bash
-python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --upgrade "shim.bin"
-[        ^-- This part comes from your successful WiFi setup -- ^      ] [^- Upgrade command]
-```
-
-Once you have flashed shim.bin successfully, you will see a "Sengled-Rescue" WiFi SSID on your network. Connect to it and open http://192.168.4.1 in your browser. From there, you will see whether it landed in "ota_0" (bad, cannot flash) or "ota_1" (good, can flash up to 1MB). Though the Flash chip in the bulb (WF863 module) is 2MB, the firmware you upload cannot "clobber" the running software (in ota_1) which begins a bit past 1MB - thus the size limitation. Uploading a firmware *.bin to "boot" completely transforms the software of the bulb, making it a basic/generic ESP8266 device.
-
-After you've flashed your software, the bulb is now a standard ESP8266EX device, for all intents and purposes.
-
-### Tasmota Templates
-
-When flashing Tasmota firmware to your Sengled bulbs, use these device templates:
-
-#### W31-N15 (RGBW Bulb)
-```json
-{"NAME":"Sengled RGBW","GPIO":[0,0,0,0,0,0,0,0,417,416,419,418,0,0],"FLAG":0,"BASE":18}
-```
-
-**Reference:** [Sengled W31-N15 Template](https://templates.blakadder.com/sengled_W31-N15.html)
-
-#### W31-N11 (White Bulb)  
-```json
-{"NAME":"Sengled W31-N11","GPIO":[0,0,0,0,416,0,0,0,0,0,0,0,0,0],"FLAG":0,"BASE":18}
-```
-
-These templates configure the correct GPIO pins for PWM control of the LED channels.
-
 ## Setup & Configuration
 
 ### Prerequisites
@@ -193,7 +162,8 @@ If ports 80/8080 are busy, the tool assumes you run your own HTTP server and wil
 
 ## Basic Control
 
-### MQTT Control - [MQTT_COMMANDS_REFERENCE.md](references/MQTT_COMMANDS_REFERENCE.md)
+<details>
+<summary><strong>MQTT Control</strong> - [MQTT_COMMANDS_REFERENCE.md](references/MQTT_COMMANDS_REFERENCE.md)</summary>
 
 ```bash
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --on
@@ -203,7 +173,10 @@ python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --color
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --color-temp 65
 ```
 
-### UDP Control - [UDP_COMMANDS_REFERENCE.md](references/UDP_COMMANDS_REFERENCE.md)
+</details>
+
+<details>
+<summary><strong>UDP Control</strong> - [UDP_COMMANDS_REFERENCE.md](references/UDP_COMMANDS_REFERENCE.md)</summary>
 
 ```bash
 python sengled_tool.py --ip 192.168.0.247 --udp-on
@@ -211,13 +184,19 @@ python sengled_tool.py --ip 192.168.0.247 --udp-off
 python sengled_tool.py --ip 192.168.0.247 --udp-brightness 50
 ```
 
+</details>
+
 ## Troubleshooting
 
-### TLS Required
+<details>
+<summary><strong>TLS Required</strong></summary>
 
 The bulb requires an MQTT broker that accepts TLS connections. Use self‑signed certificates if necessary (see [Broker Setup](#broker-setup-tls-required) above for certificate generation instructions).
 
-### Unresponsive Bulbs
+</details>
+
+<details>
+<summary><strong>Unresponsive Bulbs</strong></summary>
 
 This commonly happens after a power loss when the bulb needs to re‑query the HTTP endpoints to get MQTT broker settings.
 
@@ -250,3 +229,40 @@ python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --reset
 ```
 
 **Note:** The server defaults to your PC's local IP; use `--broker-ip` if your broker is on another device or for troubleshooting.
+
+</details>
+
+## Jailbreaking & WiFi Setup (Breaking Cloud Dependency)
+
+It is now possible to reflash Sengled bulbs (at least the W31-N15 and W31-N11 have been tested, which use the Sengled WF863 module, itself containing an ESP8266EX chip) with open firmware such as [Tasmota](https://tasmota.github.io/) (tested) and ESPHome (untested). The process to download an arbitrary firmware involves using a "shim" app known as Sengled-Rescue, which is located in the `sengled-ota` folder of the project. A compiled version of Sengled-Rescue is located in `shim.bin` of the main project.
+
+Once you set up the workflow for one bulb, flashing additional bulbs should become a 5-minute job.
+
+To flash firmware, you first need to reach "Phase 2" in MQTT mode above (follow guide below). **You need to be able to send MQTT commands through your broker using sengled_tool.py**. Once you are able to send on/off commands, you can send the `--upgrade shim.bin` command to reflash Sengled-Rescue and begin that workflow.
+
+```bash
+python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --upgrade "shim.bin"
+[        ^-- This part comes from your successful WiFi setup -- ^      ] [^- Upgrade command]
+```
+
+Once you have flashed shim.bin successfully, you will see a "Sengled-Rescue" WiFi SSID on your network. Connect to it and open http://192.168.4.1 in your browser. From there, you will see whether it landed in "ota_0" (bad, cannot flash) or "ota_1" (good, can flash up to 1MB). Though the Flash chip in the bulb (WF863 module) is 2MB, the firmware you upload cannot "clobber" the running software (in ota_1) which begins a bit past 1MB - thus the size limitation. Uploading a firmware *.bin to "boot" completely transforms the software of the bulb, making it a basic/generic ESP8266 device.
+
+After you've flashed your software, the bulb is now a standard ESP8266EX device, for all intents and purposes.
+
+### Tasmota Templates
+
+When flashing Tasmota firmware to your Sengled bulbs, use these device templates:
+
+#### W31-N15 (RGBW Bulb)
+```json
+{"NAME":"Sengled RGBW","GPIO":[0,0,0,0,0,0,0,0,417,416,419,418,0,0],"FLAG":0,"BASE":18}
+```
+
+**Reference:** [Sengled W31-N15 Template](https://templates.blakadder.com/sengled_W31-N15.html)
+
+#### W31-N11 (White Bulb)  
+```json
+{"NAME":"Sengled W31-N11","GPIO":[0,0,0,0,416,0,0,0,0,0,0,0,0,0],"FLAG":0,"BASE":18}
+```
+
+These templates configure the correct GPIO pins for PWM control of the LED channels.
