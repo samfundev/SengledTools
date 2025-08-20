@@ -703,8 +703,8 @@ class SengledTool():
     # FIX: Removed redundant and unused get_bulb_status method from this class.
     # The global, corrected function will be used instead.
 
-def startFakeHTTPServer():
-    print("Starting fake Sengled HTTP server...")
+def startLocalServer():
+    print("Starting Sengled local server...")
     server = _SetupHTTPServer(
         mqtt_host=args.broker_ip or get_local_ip(),
         mqtt_port=args.mqtt_port,
@@ -715,7 +715,7 @@ def startFakeHTTPServer():
         print("Could not start HTTP server, exiting.")
         return
 
-    print(f"Fake Sengled HTTP server running on port {server.port}.")
+    print(f"Sengled local server running on port {server.port}.")
     print("Endpoints:")
     print("  /life2/device/accessCloud.json")
     print("  /jbalancer/new/bimqtt")
@@ -795,7 +795,7 @@ def main():
     control_group.add_argument("--topic", help="Custom MQTT topic to publish to.")
     control_group.add_argument("--payload", help="Custom payload to send (raw string, not JSON).")
 
-    parser.add_argument("--run-http-server", action="store_true", help="Run the fake Sengled local HTTP server only (for firmware update testing).")
+    parser.add_argument("--run-http-server", action="store_true", help="Run the Sengled local server only (for firmware update testing).")
     parser.add_argument("--http-port", type=int, default=80, help="HTTP server port (default: 80, falls back to 8080 if unavailable).")
 
     args = parser.parse_args()
@@ -804,7 +804,7 @@ def main():
     tool = SengledTool(args)
 
     if args.run_http_server:
-        startFakeHTTPServer()
+        startLocalServer()
         try:
             while True:
                 time.sleep(1)
@@ -1073,6 +1073,12 @@ def main():
                 print("")
                 print("Press Ctrl+C after you see your firmware downloaded below, then your")
                 print("device should be running the uploaded code.")
+                print("")
+                print("Look for this message:")
+                print("###")
+                print("Served firmware file: shim.bin (XXXX bytes)")
+                print("###")
+                print("")
                 try:
                     while True:
                         time.sleep(1)

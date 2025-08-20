@@ -133,11 +133,11 @@ python sengled_tool.py --help | grep -A 10 "UDP Control"
 ### **Topic Namespaces**
 - **Bulb Control**: `wifielement/{MAC_ADDRESS}/update`
 - **Status Query**: `wifielement/{MAC_ADDRESS}/status`
-- **Firmware Update**: `wifibulb/{MAC_ADDRESS}/update`
+- **Firmware Update**: `wifielement/{MAC_ADDRESS}/update` (uses `"type": "update"`)
 
 ### **Payload Format**
 - **Control Commands**: Plain JSON array published to `wifielement/{MAC}/update` (no `Os$` wrapper in this tool)
-- **Firmware Updates**: Raw firmware URL string published to `wifibulb/{MAC}/update`
+- **Firmware Updates**: JSON array with `"type": "update"` published to `wifielement/{MAC}/update`
 - Note: the mobile app historically used `Os$[...]` and an HTTP proxy endpoint; this tool publishes directly to MQTT.
 
 ---
@@ -499,16 +499,16 @@ Example (set Daylight preset and turn on):
 **Send Firmware Update:**
 ```json
 {
-  "topic": "wifibulb/80:A0:36:E1:8E:B8/update",
-  "downMsg": "http://us-fm.cloud.sengled.com:8000/sengled/wifielement/W21-N13/firmware/firmware_info.xml"
+  "topic": "wifielement/80:A0:36:E1:8E:B8/update",
+  "message": [{"dn": "80:A0:36:E1:8E:B8", "type": "update", "value": "http://us-fm.cloud.sengled.com:8000/sengled/wifielement/W21-N13/firmware/firmware_info.xml", "time": 1662036404644}]
 }
 ```
 
 **Custom Firmware URL:**
 ```json
 {
-  "topic": "wifibulb/80:A0:36:E1:8E:B8/update",
-  "downMsg": "http://192.168.1.100/custom-firmware.bin"
+  "topic": "wifielement/80:A0:36:E1:8E:B8/update",
+  "message": [{"dn": "80:A0:36:E1:8E:B8", "type": "update", "value": "http://192.168.1.100/custom-firmware.bin", "time": 1662036404644}]
 }
 ```
 
@@ -553,11 +553,11 @@ Example (set Daylight preset and turn on):
 
 ## 🛰️ Reported Attributes (from bulb status)
 
-- **colorMode**: reported by the bulb, indicates which LED engine is active. Not a control command.
-  - `1` = RGB color mode
-  - `2` = White/color-temperature mode
+- **colorMode**: reported by the bulb, indicates which LED engine is active. **NOT a control command.**
+  - `1` = RGB color mode (RGB LED engine active)
+  - `2` = White/color-temperature mode (White LED engine active)
 
-Note: The app may also show effects with a separate status, but colorMode itself is not a command to send.
+**Note:** `colorMode` is **read-only** - it's reported by the bulb to show which LED system is currently active. You cannot send `colorMode` commands to switch between modes. The bulb automatically switches based on whether you're using RGB colors or white light.
 
 ---
 
@@ -672,25 +672,31 @@ def send_via_http(mac: str, cmd_type: str, value: str, gradient_time: int = None
 
 ## ⚠️ Important Notes
 
-1. **Topic Difference**: Firmware updates use `wifibulb/{MAC}/update` while all other commands use `wifielement/{MAC}/update`
+1. **Topic Consistency**: All commands including firmware updates use `wifielement/{MAC}/update`
 
-2. **Payload Format**: This tool uses a plain JSON array for control commands; firmware updates use a raw URL string
+2. **Payload Format**: This tool creates Python lists internally, converts them to JSON strings, and publishes those JSON strings directly to MQTT topics
 
 3. **Auto-Switch Logic**: When setting `colorTemperature`, include a `switch: "1"` command in the same payload (the official app does this automatically)
 
-4. **Timestamp**: All commands include a `time` field with current epoch milliseconds
+4. **Color Temperature Requirement**: **CRITICAL** - When changing color temperature, you MUST send both commands together:
+   ```
+   wifielement/80:A0:36:E1:8E:B8/update
+   [{"dn":"80:A0:36:E1:8E:B8","type":"colorTemperature","value":"58","time":1744263570952},{"dn":"80:A0:36:E1:8E:B8","type":"switch","value":"1","time":1744263570952}]
+   ```
 
-5. **Device ID**: All commands include `dn` (device name) field with the MAC address
+5. **Timestamp**: All commands include a `time` field with current epoch milliseconds
 
-6. **HTTP Endpoint**: All commands are sent via `POST /life2/device/executeMqttCommand.json` with `topic` and `downMsg` keys
+6. **Device ID**: All commands include `dn` (device name) field with the MAC address
 
-7. **Gradient Time**: Use `gradientTime` parameter for smooth transitions between states
+7. **HTTP Endpoint**: All commands are sent via `POST /life2/device/executeMqttCommand.json` with `topic` and `downMsg` keys
 
-8. **Scene Commands**: Use predefined scenes for quick lighting presets
+8. **Gradient Time**: Use `gradientTime` parameter for smooth transitions between states
 
-9. **TV Box Commands**: Entertainment sync commands (`audioSync`, `videoSync`, `gameSync`) are **only for TV Boxes** and entertainment systems
+9. **Scene Commands**: Use predefined scenes for quick lighting presets
 
-10. **Device Management**: Use device management commands carefully as they can reset or reconfigure devices
+10. **TV Box Commands**: Entertainment sync commands (`audioSync`, `videoSync`, `gameSync`) are **only for TV Boxes** and entertainment systems
+
+11. **Device Management**: Use device management commands carefully as they can reset or reconfigure devices
 
 ---
 

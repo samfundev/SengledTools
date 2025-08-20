@@ -1,10 +1,5 @@
 # Instructions
 
-This document expands on setup and usage. Refer to the reference files for protocol details:
-
-* MQTT command reference: [MQTT\_COMMANDS\_REFERENCE.md](MQTT_COMMANDS_REFERENCE.md)
-* UDP command reference: [UDP\_COMMANDS\_REFERENCE.md](UDP_COMMANDS_REFERENCE.md)
-
 ## Setup & Control Flow
 
 ```mermaid
@@ -51,15 +46,15 @@ graph TD
     style G fill:#d1c4e9,stroke:#512da8,stroke-width:2px
 ```
 
-## Upgrading to Open Source Firmware
+## Jailbreaking & WiFi Setup (Breaking Cloud Dependency)
 
-It is now possible to reflash Sengled bulbs (at least the W31-N15 has been tested, which uses the Sengled WF863 module, itself containing an ESP8266EX chip) with open firmware such as [Tasmota](https://tasmota.github.io/) (tested) and ESPHome (untested). The process to download an arbitrary firmware involves using a "shim" app known as Sengled-Rescue, which is located in the `sengled-ota` folder of the project. A compiled version of Sengled-Rescue is located in `shim.bin` of the main project.
+It is now possible to reflash Sengled bulbs (at least the W31-N15 and W31-N11 have been tested, which use the Sengled WF863 module, itself containing an ESP8266EX chip) with open firmware such as [Tasmota](https://tasmota.github.io/) (tested) and ESPHome (untested). The process to download an arbitrary firmware involves using a "shim" app known as Sengled-Rescue, which is located in the `sengled-ota` folder of the project. A compiled version of Sengled-Rescue is located in `shim.bin` of the main project.
 
 Once you set up the workflow for one bulb, flashing additional bulbs should become a 5-minute job.
 
-To flash firmware, you first need to reach "Phase 2" in MQTT mode above. **You need to be able to send MQTT commands through your broker using sengled_tool.py**. Once you are able to send on/off commands, you can send the `--upgrade shim.bin` command to reflash Sengled-Rescue and begin that workflow.
+To flash firmware, you first need to reach "Phase 2" in MQTT mode above (follow guide below). **You need to be able to send MQTT commands through your broker using sengled_tool.py**. Once you are able to send on/off commands, you can send the `--upgrade shim.bin` command to reflash Sengled-Rescue and begin that workflow.
 
-```
+```bash
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --upgrade "shim.bin"
 [        ^-- This part comes from your successful WiFi setup -- ^      ] [^- Upgrade command]
 ```
@@ -68,118 +63,190 @@ Once you have flashed shim.bin successfully, you will see a "Sengled-Rescue" WiF
 
 After you've flashed your software, the bulb is now a standard ESP8266EX device, for all intents and purposes.
 
-## Prerequisites
+### Tasmota Templates
+
+When flashing Tasmota firmware to your Sengled bulbs, use these device templates:
+
+#### W31-N15 (RGBW Bulb)
+```json
+{"NAME":"Sengled RGBW","GPIO":[0,0,0,0,0,0,0,0,417,416,419,418,0,0],"FLAG":0,"BASE":18}
+```
+
+**Reference:** [Sengled W31-N15 Template](https://templates.blakadder.com/sengled_W31-N15.html)
+
+#### W31-N11 (White Bulb)  
+```json
+{"NAME":"Sengled W31-N11","GPIO":[0,0,0,0,416,0,0,0,0,0,0,0,0,0],"FLAG":0,"BASE":18}
+```
+
+These templates configure the correct GPIO pins for PWM control of the LED channels.
+
+## Setup & Configuration
+
+### Prerequisites
 
 * Install Python 3.10+ and dependencies:
 
-```
+```bash
 pip install -r requirements.txt
 ```
-
-
 
 * Install an MQTT broker ([Mosquitto download link](https://mosquitto.org/download/)) reachable from the bulb.
 * Connect your computer to the bulb AP `Sengled_Wi‑Fi Bulb_XXXXXX` before pairing.
 
-## Broker setup (TLS required)
+### Broker Setup (TLS Required)
 
 The bulb requires an MQTT broker that accepts TLS connections.
 
-### Example broker: Mosquitto
+#### Example Broker: Mosquitto
 
 1. Download and install Mosquitto from the [official site](https://mosquitto.org/download/).
 2. Install OpenSSL ([Windows builds here](https://slproweb.com/products/Win32OpenSSL.html)).
 3. Generate a self‑signed TLS certificate:
-
-```
-### Windows
-# Create a local CA
-"C:\Program Files\OpenSSL-Win64\bin\openssl.exe" genrsa -out ca.key 2048
-"C:\Program Files\OpenSSL-Win64\bin\openssl.exe" req -x509 -new -key ca.key -days 3650 -out ca.crt -subj "/CN=Local-CA"
-
-# Create server key + CSR (use any descriptive CN, e.g., broker.local)
-"C:\Program Files\OpenSSL-Win64\bin\openssl.exe" genrsa -out server.key 2048
-"C:\Program Files\OpenSSL-Win64\bin\openssl.exe" req -new -key server.key -out server.csr -subj "/CN=broker.local"
-
-# Sign server cert
-"C:\Program Files\OpenSSL-Win64\bin\openssl.exe" x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 3650 -sha256
-```
-
-```
-### Linux/MacOS
-# Create a local CA
-openssl genrsa -out ca.key 2048
-openssl req -x509 -new -key ca.key -days 3650 -out ca.crt -subj "/CN=Local-CA"
-
-# Create server key + CSR (use any descriptive CN, e.g., broker.local)
-openssl genrsa -out server.key 2048
-openssl req -new -key server.key -out server.csr -subj "/CN=broker.local"
-
-# Sign server cert
-openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 3650 -sha256
-```
+    
+    <details>
+    
+    <summary>Windows</summary>
+    
+    ```bash
+    # Create a local CA
+    "C:\Program Files\OpenSSL-Win64\bin\openssl.exe" genrsa -out ca.key 2048
+    "C:\Program Files\OpenSSL-Win64\bin\openssl.exe" req -x509 -new -key ca.key -days 3650 -out ca.crt -subj "/CN=Local-CA"
+    
+    # Create server key + CSR (use any descriptive CN, e.g., broker.local)
+    "C:\Program Files\OpenSSL-Win64\bin\openssl.exe" genrsa -out server.key 2048
+    "C:\Program Files\OpenSSL-Win64\bin\openssl.exe" req -new -key server.key -out server.csr -subj "/CN=broker.local"
+    
+    # Sign server cert
+    "C:\Program Files\OpenSSL-Win64\bin\openssl.exe" x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 3650 -sha256
+    ```
+    
+    </details>
+    
+    <details>
+    
+    <summary>Linux/MacOS</summary>
+    
+    ```bash
+    # Create a local CA
+    openssl genrsa -out ca.key 2048
+    openssl req -x509 -new -key ca.key -days 3650 -out ca.crt -subj "/CN=Local-CA"
+    
+    # Create server key + CSR (use any descriptive CN, e.g., broker.local)
+    openssl genrsa -out server.key 2048
+    openssl req -new -key server.key -out server.csr -subj "/CN=broker.local"
+    
+    # Sign server cert
+    openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 3650 -sha256
+    ```
+    
+    </details>
 
 4. Place your generated certificate and key files (`ca.crt`, `server.crt`, `server.key`) in the project root directory alongside the `mosquitto.conf` file, adjusting file names if you used different names during certificate generation.
+
 5. Start Mosquitto with the bundled config:
+    
+      <details>
+    
+      <summary>Windows (PowerShell)</summary>
+    
+      Run the terminal as Administrator and ideally `cd` to the project root first:
+    
+      ```bash
+      "C:\Program Files\mosquitto\mosquitto.exe" -c .\mosquitto.conf -v
+      ```
+    
+      </details>
+    
+      <details>
+    
+      <summary>Linux/macOS</summary>
+    
+      ```bash
+      mosquitto -c ./mosquitto.conf -v
+      ```
+    
+      </details>
 
-   * Windows (PowerShell) — run the terminal as Administrator and ideally `cd` to the project root first:
+### Wi‑Fi Pairing (Quick)
 
-     ```
-     "C:\Program Files\mosquitto\mosquitto.exe" -c .\mosquitto.conf -v
-     ```
-   * Linux/macOS:
-
-     ```
-     mosquitto -c ./mosquitto.conf -v
-     ```
-
-## Wi‑Fi pairing (quick)
-
-* Interactive:
+* **Interactive Mode:**
   In interactive mode, the bulb will return a list of surrounding Wi‑Fi networks (SSIDs) it detects. The script will prompt you to choose which network it should connect to, and you will need to provide the corresponding Wi‑Fi password.
+  
   **Note:** Replace `192.168.0.100` in the examples with the local IP address of the device running the broker (most likely your PC).
 
-```
+```bash
 # If --broker-ip is omitted, the tool uses this PC's local IP automatically
 python sengled_tool.py --setup-wifi
 ```
 
-* Non‑interactive:
+* **Non‑interactive Mode:**
 
-```
+```bash
 # If --broker-ip is omitted, the tool uses this PC's local IP automatically
 python sengled_tool.py --setup-wifi --ssid "YourSSID" --password "YourWifiPassword"
 ```
 
-The tool starts an embedded HTTP server, waits for the bulb to call `/life2/device/accessCloud.json` and `/jbalancer/new/bimqtt`, then (if it detects the bulb’s LAN IP) attempts a UDP ON/OFF test and prints follow‑up command examples.
+The tool starts an embedded HTTP server, waits for the bulb to call `/life2/device/accessCloud.json` and `/jbalancer/new/bimqtt`, then (if it detects the bulb's LAN IP) attempts a UDP ON/OFF test and prints follow‑up command examples.
 
 If ports 80/8080 are busy, the tool assumes you run your own HTTP server and will not wait for endpoint hits or run the UDP test.
 
-## Control (MQTT) - [MQTT_COMMANDS_REFERENCE.md](MQTT_COMMANDS_REFERENCE.md)
+## Basic Control
 
-**Note:** Replace `192.168.0.100` with the local IP of the broker host.
+### MQTT Control - [MQTT_COMMANDS_REFERENCE.md](references/MQTT_COMMANDS_REFERENCE.md)
 
-```
+```bash
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --on
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --off
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --brightness 50
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --color 255 0 0
+python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --color-temp 65
 ```
 
-## Control (UDP) - [UDP_COMMANDS_REFERENCE.md](UDP_COMMANDS_REFERENCE.md)
+### UDP Control - [UDP_COMMANDS_REFERENCE.md](references/UDP_COMMANDS_REFERENCE.md)
 
-```
+```bash
 python sengled_tool.py --ip 192.168.0.247 --udp-on
 python sengled_tool.py --ip 192.168.0.247 --udp-off
+python sengled_tool.py --ip 192.168.0.247 --udp-brightness 50
 ```
 
-## Notes
+## Troubleshooting
 
-* TLS may be required by bulbs; use self‑signed certs if necessary.
-* **After power loss, the bulb may need to re‑query the HTTP endpoints. Make sure the broker is running. Once the bulb successfully contacts these endpoints, it will become responsive again because it retrieves the MQTT broker address from them. You can start the embedded HTTP server without re‑pairing by running:**
+### TLS Required
 
+The bulb requires an MQTT broker that accepts TLS connections. Use self‑signed certificates if necessary (see [Broker Setup](#broker-setup-tls-required) above for certificate generation instructions).
+
+### Unresponsive Bulbs
+
+This commonly happens after a power loss when the bulb needs to re‑query the HTTP endpoints to get MQTT broker settings.
+
+1) Start the local HTTP setup server so the bulb can fetch MQTT settings (use `--broker-ip` to force a specific broker IP — most likely your PC or wherever your broker is running; on Windows run terminal as Administrator):
+
+```bash
+python sengled_local_server.py
 ```
-python fake_sengled_server.py
+
+2) Power‑cycle the bulb (turn off and on)
+
+3) Watch the server logs for a hit to `/jbalancer/new/bimqtt` returning `host: <broker-ip>, port: 1883`
+
+4) Once seen, both UDP and MQTT control should resume
+
+If still stuck:
+
+- Factory reset options:
+  - Hardware: rapidly toggle power 5 times until the bulb flashes and broadcasts `Sengled_Wi‑Fi Bulb_XXXXXX`.
+  - Software: if the bulb is online on your broker (if only UDP doesn't work), you can send a reset:
+
+```bash
+python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --reset
+```
+
+- Ensure broker is running (Windows example — run terminal as Administrator and ideally `cd` to the project root first):
+
+```bash
+"C:\Program Files\mosquitto\mosquitto.exe" -c .\mosquitto.conf -v
 ```
 
 **Note:** The server defaults to your PC's local IP; use `--broker-ip` if your broker is on another device or for troubleshooting.

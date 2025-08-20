@@ -1,14 +1,13 @@
 # Sengled WiFi Bulb Local Control / Setup Tool
 
-A small reverse‑engineering and local‑control toolkit for Sengled Wi‑Fi bulbs. It pairs bulbs to your own MQTT broker (no cloud), provides UDP control, and includes an optional (untested) firmware‑upgrade publish.
-
-A comprehensive tool for local control and protocol research of Sengled Wi‑Fi bulbs. It can pair bulbs to your own MQTT broker (no cloud), provides UDP control, and optionally publishes a firmware URL for advanced users (e.g., Tasmota/ESPHome) for testing on your own devices.
+A comprehensive tool for local control and protocol research of Sengled Wi‑Fi bulbs. It can pair bulbs to your own MQTT broker (no cloud), provides UDP control, and includes firmware flashing capability to install open source firmware like Tasmota since Sengled's cloud servers are no longer functional.
 
 > [!IMPORTANT]
-> This code base is based on testing with a **W31-N15** bulb, which uses Sengled's WF863 module (based on ESP8266EX). **Other bulbs appear to use other modules** (like WF864, based on MX1290 chip), which may not work with this system. We're working on acquiring other bulbs to test/develop with them and will add to this list.
+> The **flashing/jailbreaking process** is based on testing with **W31-N15 and W31-N11** bulbs, which use Sengled's WF863 module (based on ESP8266EX). **Other bulbs appear to use other modules** (like WF864, based on MX1290 chip), which may not work with the flashing process. The basic MQTT/UDP control should work with most Sengled bulbs. We're working on acquiring other bulbs to test/develop with them and will add to this list.
 >
 > Currently known working bulbs ✅
 > * W31-N15 (WiFi multi-color LED) - WF863 Module / Espressif ESP8266EX chip
+> * W31-N11 (WiFi multi-color LED) - WF863 Module 
 >
 > Currently known NON-working bulbs ❌
 > * W12-N15 (WiFi white LED) - WF864 module / MXCHIP MX1290 chip
@@ -16,7 +15,7 @@ A comprehensive tool for local control and protocol research of Sengled Wi‑Fi 
 >
 > Check the side of your bulb for FCC ID - it contains the ID of the module (or chip) used inside the bulb, matching one of the above. Post an issue if you find a bulb using a supported module that's not listed!
 
-## Quick usage (current flow)
+## Quick Usage
 
 For a fuller, step‑by‑step guide, see [Instructions](INSTRUCTIONS.md).
 
@@ -31,7 +30,7 @@ The tool can perform Wi‑Fi pairing and basic UDP control. The HTTP server used
 pip install -r requirements.txt
 ```
 
-### Wi‑Fi pairing steps
+### Wi‑Fi Pairing Steps
 
 1. Start your MQTT broker (e.g., Mosquitto). See more information and examples in [INSTRUCTIONS.md](INSTRUCTIONS.md).
 
@@ -51,15 +50,15 @@ pip install -r requirements.txt
       # If --broker-ip is omitted, the tool uses this PC's local IP automatically
       python sengled_tool.py --setup-wifi
      ```
-     Connect your computer to the bulb’s AP: `Sengled_Wi‑Fi_Bulb_...` when prompted
+     Connect your computer to the bulb's AP: `Sengled_Wi‑Fi_Bulb_...` when prompted
    * Non‑interactive:
 
-     Connect your computer to the bulb’s AP: `Sengled_Wi‑Fi_Bulb_...` first.
+     Connect your computer to the bulb's AP: `Sengled_Wi‑Fi_Bulb_...` first.
      ```
       # If --broker-ip is omitted, the tool uses this PC's local IP automatically
       python sengled_tool.py --setup-wifi --ssid "YourSSID" --password "YourWifiPassword"
      ```
-4. If the embedded HTTP server can’t bind to 80/8080, stop whatever is on those ports or set `SENGLED_HTTP_PORT`.
+4. If the embedded HTTP server can't bind to 80/8080, stop whatever is on those ports or set `SENGLED_HTTP_PORT`.
 5. The bulb will hit:
 
    * `POST/GET /life2/device/accessCloud.json`
@@ -76,9 +75,12 @@ What happens:
   * `POST/GET /jbalancer/new/bimqtt` (returns `{ protocal: "mqtt", host: <broker-ip>, port: 1883 }`)
 * After that, it blinks the bulb via UDP (ON → 3s → OFF) as a quick success indicator.
 
-### MQTT control (via broker) - [MQTT_COMMANDS_REFERENCE.md](MQTT_COMMANDS_REFERENCE.md)
+## MQTT Control
 
-Use these after the bulb is paired and connected to your broker.
+Use these commands after the bulb is paired and connected to your broker. See [MQTT_COMMANDS_REFERENCE.md](MQTT_COMMANDS_REFERENCE.md) for complete details.
+
+<details>
+<summary>Basic Commands</summary>
 
 ```
 # Turn on
@@ -102,7 +104,14 @@ python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --statu
 
 # Factory reset
 python sengled_tool.py --mac E8:DB:8A:AA:BB:CC --reset
+```
 
+</details>
+
+<details>
+<summary>Advanced Commands</summary>
+
+```
 # Custom payload (JSON array of command objects)
 # Example: turn on via raw publish
 python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC \
@@ -127,7 +136,14 @@ python sengled_tool.py --broker-ip 192.168.0.100 \
   --group-switch on
 ```
 
-### UDP control (direct local commands)
+</details>
+
+## UDP Control
+
+Direct local commands that don't require the MQTT broker or HTTP setup server once the bulb is paired and on your network. See [UDP_COMMANDS_REFERENCE.md](references/UDP_COMMANDS_REFERENCE.md) for complete details.
+
+<details>
+<summary>Basic UDP Commands</summary>
 
 ```
 # Replace <bulb-ip> with the bulb's IP
@@ -147,69 +163,40 @@ python sengled_tool.py --ip <bulb-ip> --udp-color 255 0 0
 
 **Note:** There might be more UDP commands available. Check [UDP_COMMANDS_REFERENCE.md](UDP_COMMANDS_REFERENCE.md) for the complete list of documented commands.
 
-UDP control does not require the MQTT broker or HTTP setup server once the bulb is paired and on your LAN.
 
-Power loss behavior:
 
-- After a power cycle, some bulbs re‑query the HTTP endpoints (`/life2/device/accessCloud.json` and `/jbalancer/new/bimqtt`) to fetch MQTT settings before connecting. Make sure your MQTT broker is running. If the bulb doesn’t reconnect, start the local HTTP setup server once:
-  ```
-  python fake_sengled_server.py
-  ```
-  **Note:** The server defaults to your PC's local IP; use `--broker-ip` if your broker is on another device or for troubleshooting.
-  This binds to port 80 (falls back to 8080). If you use a non‑default port, ensure pairing pointed the bulb to that port.
+</details>
 
-### Troubleshooting quick actions
+## Troubleshooting
 
-- Start the local HTTP setup server so the bulb can fetch MQTT settings (use `--broker-ip` to force a specific broker IP — most likely your PC or wherever your broker is running; on Windows run terminal as Administrator):
-  ```
-  python fake_sengled_server.py
-  ```
-  **Note:** The server defaults to your PC's local IP; use `--broker-ip` if your broker is on another device or for troubleshooting.
-
-- Factory reset options:
-
-  * Hardware: rapidly toggle power 5–10 times until the bulb flashes and broadcasts `Sengled_Wi‑Fi Bulb_XXXXXX`.
-  * Software: if the bulb is online on your broker, you can send a reset:
-
-    ```
-    python sengled_tool.py --broker-ip 192.168.0.100 --mac E8:DB:8A:AA:BB:CC --reset
-    ```
-* Ensure broker is running (Windows example — run terminal as Administrator and ideally `cd` to the project root first):
-
-  ```
-  "C:\\Program Files\\mosquitto\\mosquitto.exe" -c .\\mosquitto.conf -v
-  ```
- 
-
----
-
-### If UDP commands time out
-
-- **Observed (not 100% confirmed)**: If the bulb can’t reach the local HTTP endpoints (`/life2/device/accessCloud.json` and `/jbalancer/new/bimqtt`) after power-up, it may ignore UDP. Some bulbs appear to re-query these endpoints on boot before enabling MQTT/UDP.
-- **Try this**:
-  1) Start your MQTT broker.
-  2) Run the local HTTP server (it defaults to your PC's IP; use --broker-ip if your broker is on another device or for troubleshooting): `python fake_sengled_server.py`
-  3) Power-cycle the bulb at the wall switch.
-  4) Watch the server logs for a hit to `/jbalancer/new/bimqtt` returning `host: <broker-ip>, port: 1883`.
-  5) Once seen, control via MQTT should resume. If the bulb stays flaky, send a reset via MQTT and redo Wi‑Fi pairing.
+See the consolidated guide in Instructions: [INSTRUCTIONS.md — Troubleshooting](INSTRUCTIONS.md#troubleshooting).
 
 ## FAQ
 
-* How do I use this with Home Assistant?
+<details>
+<summary>How do I use this with Home Assistant?</summary>
 
-  * This repo contains the protocol details (MQTT topics/payloads and UDP commands) that enable creating a Home Assistant integration. It does not include one.
+**Yes, but only if custom firmware (like Tasmota) is used.** This repo does not include a Home Assistant integration, but it's possible to create one fairly easily using the documented MQTT topics and payloads. However, the MQTT broker will need to be running, or UDP commands will need to be used. **For easier usage, it's better to flash the firmware with Tasmota.**
 
-* Will this make my bulbs work with Google Home?
+</details>
 
-  * If a bulb was already paired with Sengled cloud, it should continue to work with Google Home as before. You can still control it locally via UDP.
-  * Bulbs newly paired with this tool are redirected to your local broker and do not register with Sengled cloud; they will not work with the official Sengled Google Home integration.
+<details>
+<summary>Will this make my bulbs work with Google Home?</summary>
 
-* I don’t use Home Assistant. Can I still control bulbs?
+* If a bulb was already paired with Sengled cloud, it should continue to work with Google Home as before. You can still control it locally via UDP.
+* Bulbs newly paired with this tool are redirected to your local broker and do not register with Sengled cloud; they will not work with the official Sengled Google Home integration.
+* **However, if you use Home Assistant, you can integrate with Google Home through Home Assistant's Google Assistant integration.**
 
-  * Yes, but you’ll need a custom solution unless someone publishes an integration. Options: a small Android app, a simple script/service on a PC or server triggered by your phone (shortcuts/webhooks), or any automation that publishes the documented MQTT or UDP commands.
+</details>
 
+<details>
+<summary>I don't use Home Assistant. Can I still control bulbs?</summary>
 
-### Wi‑Fi setup sequence (reverse‑engineered)
+**Yes, with the documented MQTT and UDP commands.** For easier usage, it's recommended to use webhooks, automation scripts, or create a simple control interface. Options include: a small Android app, a simple script/service on a PC or server triggered by your phone (shortcuts/webhooks), or any automation that publishes the documented MQTT or UDP commands.
+
+</details>
+
+## Wi-Fi Setup Sequence
 
 The following diagram shows the local AP-mode pairing flow: what the tool sends to the bulb, what the bulb fetches from your local HTTP server, and how it connects to your MQTT broker. This matches the actual behavior in `sengled_tool.py` and the documented endpoints.
 
