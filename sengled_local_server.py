@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Fake Sengled HTTP Server
-Simulates the Sengled cloud endpoints for local testing.
+Sengled Local Server
+Emulates the Sengled cloud endpoints locally for Wi-Fi setup and MQTT redirection.
 """
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -95,7 +95,7 @@ def run_server(port=80, broker_host=None):
 
     try:
         server = HTTPServer(('', port), SengledRequestHandler)
-        logging.info(f"Starting fake Sengled server on port {port}")
+        logging.info(f"Starting Sengled local server on port {port}")
         logging.info("Endpoints available:")
         logging.info("  - POST /jbalancer/new/bimqtt")
         logging.info("  - POST /life2/device/accessCloud.json")
@@ -118,7 +118,7 @@ if __name__ == "__main__":
         logging.warning("1. Run Command Prompt as Administrator")
         logging.warning("2. Or server will fallback to port 8080")
 
-    parser = argparse.ArgumentParser(description="Fake Sengled HTTP server")
+    parser = argparse.ArgumentParser(description="Sengled Local Server")
     parser.add_argument("--http-port", type=int, default=80, help="HTTP port to bind (default: 80; falls back to 8080 on permission error)")
     parser.add_argument("--broker-ip", type=str, help="MQTT broker IP to return from /jbalancer/new/bimqtt (default: this machine's local IP)")
     args = parser.parse_args()
