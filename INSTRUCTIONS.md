@@ -1,11 +1,10 @@
 # Instructions
 
 ## Quick Navigation
-
-- **[Jailbreaking & WiFi Setup (Breaking Cloud Dependency)](#jailbreaking--wifi-setup-breaking-cloud-dependency)** - Flash custom firmware and break cloud dependency
 - **[Setup & Configuration](#setup--configuration)** - Initial setup and configuration steps
 - **[Basic Control](#basic-control)** - Common control commands and usage
 - **[Troubleshooting](#troubleshooting)** - Common issues and solutions
+- **[Jailbreaking & WiFi Setup (Breaking Cloud Dependency)](#jailbreaking--wifi-setup-breaking-cloud-dependency)** - Flash custom firmware and break cloud dependency
 
 ## Setup & Control Flow
 
