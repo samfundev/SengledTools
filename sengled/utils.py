@@ -15,6 +15,37 @@ def get_local_ip() -> str:
     except OSError:
         return "127.0.0.1"
 
+def get_mac_address(ip: Optional[str] = None, interface: Optional[str] = None) -> Optional[str]:
+    """Get MAC address using psutil (cross-platform, more reliable than getmac).
+    
+    Args:
+        ip: IP address to find MAC for (not fully supported, use interface instead)
+        interface: Network interface name (e.g., 'eth0', 'wlan0')
+    
+    Returns:
+        MAC address string or None if not found
+    """
+    try:
+        import psutil
+        
+        if interface:
+            # Get MAC for specific interface
+            addrs = psutil.net_if_addrs().get(interface, [])
+            for addr in addrs:
+                if addr.family == psutil.AF_LINK:
+                    return addr.address
+        else:
+            # Get first non-loopback interface MAC
+            for name, addrs in psutil.net_if_addrs().items():
+                if name != 'lo' and addrs:
+                    for addr in addrs:
+                        if addr.family == psutil.AF_LINK:
+                            return addr.address
+        
+        return None
+    except ImportError:
+        return None
+
 def get_config_dir() -> Path:
     """Gets the configuration directory for the application."""
     return Path.home() / ".sengled"
