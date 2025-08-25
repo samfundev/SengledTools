@@ -40,6 +40,7 @@ from sengled.utils import (
     load_bulbs,
     get_current_epoch_ms,
     get_bulb_broker,
+    normalize_mac_address,
 )
 from sengled.log import configure, say, step, info, warn, debug, send, recv, section, subsection, success, waiting, result, rule, is_verbose, stop, cmd
 from sengled.http_server import SetupHTTPServer
@@ -226,137 +227,12 @@ class SengledTool:
         if broker:
             broker.stop()
 
-<<<<<<< Updated upstream
 def startLocalServer(mqtt_host, mqtt_port, preferred_port):
     print("Starting Sengled local server...")
     server = _SetupHTTPServer(mqtt_host,mqtt_port,preferred_port)
     started = server.start()
     if not started:
         print("Could not start HTTP server, exiting.")
-=======
-    def _post_wifi_setup_flow(self, bulb_mac: Optional[str], setup_server: Optional[SetupHTTPServer]):
-        if not bulb_mac or not setup_server:
-            stop("Wi-Fi setup failed. Exiting wizard.")
-            return
-
-        _print_post_pairing_summary(bulb_mac, setup_server.last_client_ip)
-
-        try:
-            info("")
-            support_info = getattr(setup_server, "support_info", None)
-            choice = None
-
-            if support_info and not getattr(self.args, "force_flash", False):
-                model = support_info.get("model") or "Unknown"
-                module = support_info.get("module") or "Unknown"
-                category = support_info.get("category")
-
-                if category == "supported":
-                    section("Flashing")
-                    success(f"Model: {model} | Module: {module}")
-                    cmd("Flashing is supported for this model", extra_indent=4)
-                    resp = input("\nDo you want to flash the firmware now? [Y/n]: ").strip().lower()
-                    choice = "flash" if resp in ("", "y", "yes") else "skip"
-
-                elif category == "untested":
-                    warn(f"⚠️ Model: {model} | Module: {module}")
-                    cmd("Bulbs with ESP8266 have been successfully flashed, but this specific model hasn't been tested. Proceed with caution.")
-                    resp = input("Do you want to attempt flashing anyway? [y/N]: ").strip().lower()
-                    choice = "flash" if resp in ("y", "yes") else "skip"
-
-                elif category == "not_supported":
-                    stop(f"🚫 Model: {model} | Module: {module}")
-                    cmd("This model is not supported by the current shim. MQTT/UDP control will still work, but flashing is disabled.")
-                    info("")
-                    say("Options:")
-                    say("  [q] Quit")
-                    say("  [r] Reset bulb and continue without flashing")
-                    info("")
-                    say("Tip: You can force flashing by re-running the process with --force-flash.")
-                    resp = input("What would you like to do? [q/r]: ").strip().lower()
-                    if resp == "r":
-                        client = self.create_mqtt_client(broker_host="127.0.0.1", broker_port=BROKER_TLS_PORT)
-                        if client.connect():
-                            try:
-                                from sengled.command_handler import CommandHandler
-                                CommandHandler.send_reset_command(client, bulb_mac)
-                                success("Reset command sent.")
-                            finally:
-                                client.disconnect()
-                        else:
-                            warn("Could not connect to MQTT broker to send reset command.")
-                        choice = "skip"
-                    else:
-                        choice = "quit"
-
-            else:
-                if support_info and getattr(self.args, "force_flash", False) and support_info.get("category") == "not_supported":
-                    warn("Forcing flashing on an unsupported model. Proceed at your own risk.")
-                    resp = input("Proceed with forced flashing? [y/N]: ").strip().lower()
-                    choice = "flash" if resp in ("y", "yes") else "skip"
-                else:
-                    proceed = input("Do you want to flash a firmware? [Y/n]: ").strip().lower()
-                    choice = "flash" if proceed in ("", "y", "yes") else "skip"
-
-            if choice == "flash":
-                client = self.create_mqtt_client(broker_host="127.0.0.1", broker_port=BROKER_TLS_PORT)
-                if client.connect():
-                    try:
-                        upgrade_sent = run_firmware_upgrade(self.args, bulb_mac, setup_server, client)
-                        if upgrade_sent:
-                            success("Firmware upgrade command sent and download started.")
-                            import shutil
-                            cert_dir = Path.home() / ".sengled" / "certs"
-                            if cert_dir.exists():
-                                shutil.rmtree(cert_dir)
-                        else:
-                            warn("Firmware upgrade command failed to send.")
-                    finally:
-                        client.disconnect()
-                else:
-                    warn("Could not connect to MQTT broker to send upgrade command.")
-                
-                self._stop_servers(setup_server)
-                success("Wizard finished.")
-            elif choice == "quit":
-                self._stop_servers(setup_server)
-                success("Wizard finished.")
-            else:
-                self._stop_servers(setup_server)
-                info("")
-                info("To resume control, restart the broker and HTTP server and wait for up to a minute for the bulb to reconnect")
-                say("  ⮞ python sengled_tool.py --run-servers")
-                info("")
-                success("Setup complete. Goodbye!")
-
-        except KeyboardInterrupt:
-            info("")
-            info("\nOperation cancelled by user.")
-            self._stop_servers(setup_server)
-
-    def run_setup_wizard(self):
-        """Runs the interactive setup wizard with firmware flashing option."""
-        section("Sengled Setup Wizard")
-        info("This wizard will guide you through setting up your bulb for local control.")
-
-        bulb_mac, setup_server = run_wifi_setup(self.args, interactive=True)
-        self._post_wifi_setup_flow(bulb_mac, setup_server)
-
-
-
-
-
-def handle_run_http_server(args, resolved_broker_ip: str):
-    section("Local Server")
-    info("Starting Sengled local server...")
-    server = SetupHTTPServer(
-        mqtt_host=resolved_broker_ip or get_local_ip(),
-        mqtt_port=args.broker_port,
-        preferred_port=args.http_port,
-    )
-    if not server.start():
-        stop("Could not start HTTP server, exiting.")
->>>>>>> Stashed changes
         return
 
     success(f"Server running on port {server.port}")
@@ -574,6 +450,23 @@ def main():
     args = parser.parse_args()
     configure(verbose=args.verbose)
 
+    # Normalize and validate MAC inputs early
+    if getattr(args, "mac", None):
+        try:
+            args.mac = normalize_mac_address(args.mac)
+            debug(f"Normalized MAC address: {args.mac}")
+        except ValueError as e:
+            warn(f"Invalid --mac: {e}")
+            sys.exit(2)
+
+    if getattr(args, "group_macs", None):
+        try:
+            args.group_macs = [normalize_mac_address(m) for m in args.group_macs]
+            debug(f"Normalized group MACs: {args.group_macs}")
+        except ValueError as e:
+            warn(f"Invalid --group-macs entry: {e}")
+            sys.exit(2)
+
     # Handle certificate regeneration
     if args.regen_certs:
         cert_dir = Path.home() / ".sengled" / "certs"
@@ -603,7 +496,6 @@ def main():
     tool = SengledTool(args)
 
     if args.run_http_server:
-<<<<<<< Updated upstream
         startLocalServer(resolved_broker_ip, args.mqtt_port, args.http_port)
         try:
             while True:
@@ -612,9 +504,6 @@ def main():
             print("\nStopping HTTP server...")
             server.stop()
             print("Server stopped.")
-=======
-        handle_run_http_server(args, resolved_broker_ip)
->>>>>>> Stashed changes
         return
         
     if args.run_servers:

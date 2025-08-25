@@ -1,6 +1,7 @@
 import json
 import socket
 import time
+import re
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -73,6 +74,23 @@ def get_bulb_broker(mac: str) -> Optional[str]:
     """Retrieves the broker IP for a given bulb MAC address."""
     bulbs = load_bulbs()
     return bulbs.get(mac, {}).get("broker")
+
+def normalize_mac_address(mac: str) -> str:
+    """Return MAC in canonical uppercase colon-delimited form (XX:XX:XX:XX:XX:XX).
+
+    Raises ValueError if input is empty or not 12 hex digits (colons/hyphens optional).
+    """
+    if not mac:
+        raise ValueError("MAC address cannot be empty")
+
+    candidate = mac.strip().upper()
+    # remove common separators
+    hex_only = re.sub(r"[:-]", "", candidate)
+
+    if not re.fullmatch(r"[0-9A-F]{12}", hex_only):
+        raise ValueError(f"Invalid MAC address format: {mac}")
+
+    return ":".join(hex_only[i:i+2] for i in range(0, 12, 2))
 
 def get_current_epoch_ms() -> int:
     """Returns the current time in milliseconds since the epoch."""
