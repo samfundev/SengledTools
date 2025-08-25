@@ -703,13 +703,9 @@ class SengledTool():
     # FIX: Removed redundant and unused get_bulb_status method from this class.
     # The global, corrected function will be used instead.
 
-def startLocalServer():
+def startLocalServer(mqtt_host, mqtt_port, preferred_port):
     print("Starting Sengled local server...")
-    server = _SetupHTTPServer(
-        mqtt_host=args.broker_ip or get_local_ip(),
-        mqtt_port=args.mqtt_port,
-        preferred_port=args.http_port
-    )
+    server = _SetupHTTPServer(mqtt_host,mqtt_port,preferred_port)
     started = server.start()
     if not started:
         print("Could not start HTTP server, exiting.")
@@ -804,7 +800,7 @@ def main():
     tool = SengledTool(args)
 
     if args.run_http_server:
-        startLocalServer()
+        startLocalServer(resolved_broker_ip, args.mqtt_port, args.http_port)
         try:
             while True:
                 time.sleep(1)
