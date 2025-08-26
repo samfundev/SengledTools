@@ -233,7 +233,7 @@ UDP Control (Local Network):
 
 ## Wi-Fi Setup Sequence
 
-The Wi-Fi pairing process follows a specific sequence of UDP commands and HTTP requests. See [WIFI_PAIRING_REFERENCE.md](docs/examples/WIFI_PAIRING_REFERENCE.md) for the complete sequence diagram and technical details.
+The Wi-Fi pairing process follows a specific sequence of UDP commands and HTTP requests. See [WIFI_PAIRING_REFERENCE.md](docs/references/WIFI_PAIRING_REFERENCE.md) for the complete sequence diagram and technical details.
 
 ## Next Steps
 
