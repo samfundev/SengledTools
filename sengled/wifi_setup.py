@@ -361,39 +361,38 @@ def run_wifi_setup(
 						success(f"Bulb at {client_ip} contacted both endpoints", extra_indent=2)
 							
 						# Listen for bulb attributes
-						if _embedded_broker:
-							mqtt_client = create_mqtt_client(args, broker_host="127.0.0.1")
-							if mqtt_client.connect():
-								try:
-									info("")
-									subsection("Device Attributes")
-									waiting(f"Listening for attributes from {bulb_mac}...")
-									attrs = _listen_for_bulb_attributes(mqtt_client, bulb_mac)
-									if attrs:
-										for key, value in attrs.items():
-											cmd(f"{key}: {value}", extra_indent=4)
-										# Determine flashing support category and store for later prompt
-										type_code = str(attrs.get("typeCode", "") or "")
-										identify_no = str(attrs.get("identifyNO", "") or "")
-										category = "unknown"
-										if type_code in SUPPORTED_TYPECODES:
-											category = "supported"
-										elif any(marker in identify_no.upper() for marker in COMPATIBLE_IDENTIFY_MARKERS):
-											category = "untested"
-										else:
-											category = "not_supported"
-										if setup_server:
-											setattr(setup_server, "support_info", {
-												"model": type_code or "Unknown",
-												"module": identify_no or "Unknown",
-												"category": category,
-											})
+						mqtt_client = create_mqtt_client(args, broker_host=args.broker_ip if hasattr(args, 'broker_ip') and args.broker_ip else "127.0.0.1")
+						if mqtt_client.connect():
+							try:
+								info("")
+								subsection("Device Attributes")
+								waiting(f"Listening for attributes from {bulb_mac}...")
+								attrs = _listen_for_bulb_attributes(mqtt_client, bulb_mac)
+								if attrs:
+									for key, value in attrs.items():
+										cmd(f"{key}: {value}", extra_indent=4)
+									# Determine flashing support category and store for later prompt
+									type_code = str(attrs.get("typeCode", "") or "")
+									identify_no = str(attrs.get("identifyNO", "") or "")
+									category = "unknown"
+									if type_code in SUPPORTED_TYPECODES:
+										category = "supported"
+									elif any(marker in identify_no.upper() for marker in COMPATIBLE_IDENTIFY_MARKERS):
+										category = "untested"
 									else:
-										warn_("Could not retrieve all bulb attributes.", extra_indent=4)
-								finally:
-									mqtt_client.disconnect()
-							else:
-								warn_("Could not connect to embedded broker to retrieve attributes.")
+										category = "not_supported"
+									if setup_server:
+										setattr(setup_server, "support_info", {
+											"model": type_code or "Unknown",
+											"module": identify_no or "Unknown",
+											"category": category,
+										})
+								else:
+									warn_("Could not retrieve all bulb attributes.", extra_indent=4)
+							finally:
+								mqtt_client.disconnect()
+						else:
+							warn_("Could not connect to MQTT broker to retrieve attributes.")
 					else:
 						warn_("Timeout waiting for endpoints")
 

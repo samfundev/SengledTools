@@ -227,6 +227,76 @@ class SengledTool:
         if broker:
             broker.stop()
 
+    def _post_wifi_setup_flow(self, bulb_mac: str, setup_server) -> None:
+        """After Wi‑Fi setup: print summary, gate flashing by compatibility, optionally flash.
+
+        Flow:
+        - Always show post-pairing summary so user can test control.
+        - If `--setup-wifi` was provided, caller handles final summary/hold; otherwise we prompt to flash.
+        - Flashing is gated by `setup_server.support_info` and `--force-flash`.
+        """
+        # Show immediate next steps for control
+        _print_post_pairing_summary(bulb_mac, getattr(setup_server, "last_client_ip", None))
+
+        # Determine support category gathered during attribute probe (if any)
+        support_info = getattr(setup_server, "support_info", None)
+        category = (support_info or {}).get("category", "unknown")
+        model = (support_info or {}).get("model", "Unknown")
+        module = (support_info or {}).get("module", "Unknown")
+
+        info("")
+        subsection("Flashing Compatibility")
+        info(f"Model: {model}",  extra_indent=4)
+        info(f"Module: {module}",  extra_indent=4)
+
+        # Hard gate for non-supported unless overridden
+        if category == "supported":
+            success("Supported for shim flashing.")
+        elif category == "untested":
+            warn("Untested combination. Flashing may work but is not guaranteed.")
+        elif category == "not_supported" and not getattr(self.args, "force_flash", False):
+            stop(
+                "This model/module is not supported for flashing. Re-run with --force-flash to override.")
+            self._stop_servers(setup_server)
+            return
+        else:
+            warn("Could not determine compatibility. Proceed at your own risk.")
+
+        # Ask user whether to proceed with firmware flashing
+        try:
+            info("")
+            choice = input("Flash custom firmware (jailbreak) now? (y/N): ").strip().lower()
+        except KeyboardInterrupt:
+            info("\nSkipping firmware upgrade.")
+            self._stop_servers(setup_server)
+            return
+
+        if choice not in ("y", "yes"):
+            info("Skipping firmware upgrade. You can flash later using --upgrade or by using the wizard flow (after a reset)")
+            self._stop_servers(setup_server)
+            return
+
+        # If user insists and we previously flagged not_supported, warn again unless forced
+        if category == "not_supported" and not getattr(self.args, "force_flash", False):
+            stop("Flashing blocked due to unsupported device. Use --force-flash to override.")
+            self._stop_servers(setup_server)
+            return
+
+        # Proceed with upgrade
+        client = self.create_mqtt_client()
+        if not client.connect():
+            warn("Failed to connect to MQTT broker for firmware upgrade.")
+            self._stop_servers(setup_server)
+            return
+        try:
+            run_firmware_upgrade(self.args, bulb_mac, setup_server, client)
+        finally:
+            try:
+                client.disconnect()
+            except Exception:
+                pass
+            self._stop_servers(setup_server)
+
 def startLocalServer(mqtt_host, mqtt_port, preferred_port):
     print("Starting Sengled local server...")
     server = _SetupHTTPServer(mqtt_host,mqtt_port,preferred_port)
@@ -262,8 +332,12 @@ def handle_run_servers(args, resolved_broker_ip: str):
     # Start embedded MQTT broker
     cert_dir = Path.home() / ".sengled" / "certs"
     broker = EmbeddedBroker(cert_dir, verbose=args.verbose)
-    broker.start()
-    success(f"MQTT broker running on port 8883 (TLS)", extra_indent=4)
+    try:
+        broker.start()
+        success(f"MQTT broker running on port 8883 (TLS)", extra_indent=4)
+    except Exception as e:
+        stop(str(e))
+        return
     
     # Start HTTP server
     http_port = args.http_port or 8080
