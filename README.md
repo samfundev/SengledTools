@@ -5,13 +5,12 @@ A comprehensive tool for local control and protocol research of Sengled Wi‑Fi 
 ## Quick Navigation
 
 - **[Quick Start: The Easy Setup Wizard](#quick-start-the-easy-setup-wizard)** - Zero-config wizard for beginners
-- **[Jailbreaking & Custom Firmware](#jailbreaking--custom-firmware)** - Flash Tasmota/ESPHome
-- **[WiFi Pairing Reference](#wifi-pairing-reference-reverse-engineered)** - Technical pairing details
 - **[Factory Reset Procedures](docs/RESET_PROCEDURES.md)** - Visual reset steps for devices
+- **[Flashing Information](#flashing-information)** - Flash Tasmota/ESPHome
 - **[Command Reference](#command-reference)** - Complete CLI help and options
 - **[FAQ](#faq)** - Frequently asked questions
-- **[Wi-Fi Setup Sequence](#wi-fi-setup-sequence)** - Technical setup flow
-
+- **[Wi-Fi Setup Sequence](#wi-fi-setup-sequence)** - Technical pairing details
+- **[Advanced Instructions](docs/INSTRUCTIONS_ADVANCED.md)** - Detailed troubleshooting and advanced usage
 
 
 ## Quick Start: The Easy Setup Wizard
@@ -20,13 +19,24 @@ This is the new version. Use the zero‑config wizard. No external Mosquitto. No
 
 ### Prerequisites
 
-* Install Python 3.10+ and dependencies:
+**Step 1:** Install Python 3.10 or newer from [https://www.python.org/downloads/](https://www.python.org/downloads/)
 
+**Step 2:** Download this tool in your terminal/command prompt:
+```bash
+git clone https://github.com/HamzaETTH/SengledTools.git
+```
+
+**Step 3:** Navigate to the downloaded folder:
+```bash
+cd SengledTools
+```
+
+**Step 4:** Install Python dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-* Connect your computer to the bulb AP `Sengled_Wi‑Fi Bulb_XXXXXX` before pairing.
+**Step 5:** Power on bulb and connect your computer to the bulb AP `Sengled_Wi‑Fi Bulb_XXXXXX`
 
 ### Step-by-Step Setup
 
