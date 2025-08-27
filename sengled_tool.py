@@ -299,7 +299,7 @@ class SengledTool:
 
 def startLocalServer(mqtt_host, mqtt_port, preferred_port):
     print("Starting Sengled local server...")
-    server = _SetupHTTPServer(mqtt_host,mqtt_port,preferred_port)
+    server = SetupHTTPServer(mqtt_host,mqtt_port,preferred_port)
     started = server.start()
     if not started:
         print("Could not start HTTP server, exiting.")
@@ -570,14 +570,8 @@ def main():
     tool = SengledTool(args)
 
     if args.run_http_server:
-        startLocalServer(resolved_broker_ip, args.mqtt_port, args.http_port)
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("\nStopping HTTP server...")
-            server.stop()
-            print("Server stopped.")
+        # Use broker-port (default 8883) for the MQTT TLS port
+        startLocalServer(resolved_broker_ip, args.broker_port, args.http_port)
         return
         
     if args.run_servers:
@@ -624,8 +618,20 @@ def main():
     elif args.mac:
         cmd_handler.handle_single_mqtt_control()
     else:
-        # Default to the setup wizard instead of REPL
-        tool.run_setup_wizard()
+        # Default to interactive Wi‑Fi setup (AP scan + selection)
+        section("SengledTool")
+        info(
+            "This tool will guide you through Wi-Fi network setup, bulb control, and firmware flashing."
+        )
+
+        bulb_mac, setup_server = run_wifi_setup(args, interactive=True)
+
+        if bulb_mac and setup_server:
+            # In default flow (no --setup-wifi), proceed to flashing prompt
+            tool._post_wifi_setup_flow(bulb_mac, setup_server)
+        else:
+            # run_wifi_setup prints its own errors, so we just add a final status
+            warn("Wi-Fi setup did not complete.")
         return
 
 
