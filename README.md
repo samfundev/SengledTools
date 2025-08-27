@@ -20,13 +20,24 @@ This is the new version. Use the zero‑config wizard. No external Mosquitto. No
 
 ### Prerequisites
 
-* Install Python 3.10+ and dependencies:
+**Step 1:** Install Python 3.10 or newer from [https://www.python.org/downloads/](https://www.python.org/downloads/)
 
+**Step 2:** Download this tool in your terminal/command prompt:
+```bash
+git clone https://github.com/HamzaETTH/SengledTools.git
+```
+
+**Step 3:** Navigate to the downloaded folder:
+```bash
+cd SengledTools
+```
+
+**Step 4:** Install Python dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-* Connect your computer to the bulb AP `Sengled_Wi‑Fi Bulb_XXXXXX` before pairing.
+**Step 5:** Power on bulb and connect your computer to the bulb AP `Sengled_Wi‑Fi Bulb_XXXXXX`
 
 ### Step-by-Step Setup
 
