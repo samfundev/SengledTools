@@ -7,6 +7,7 @@ A comprehensive tool for local control and protocol research of Sengled Wi‑Fi 
 - **[Quick Start: The Easy Setup Wizard](#quick-start-the-easy-setup-wizard)** - Zero-config wizard for beginners
 - **[Jailbreaking & Custom Firmware](#jailbreaking--custom-firmware)** - Flash Tasmota/ESPHome
 - **[WiFi Pairing Reference](#wifi-pairing-reference-reverse-engineered)** - Technical pairing details
+- **[Factory Reset Procedures](docs/RESET_PROCEDURES.md)** - Visual reset steps for devices
 - **[Command Reference](#command-reference)** - Complete CLI help and options
 - **[FAQ](#faq)** - Frequently asked questions
 - **[Wi-Fi Setup Sequence](#wi-fi-setup-sequence)** - Technical setup flow
