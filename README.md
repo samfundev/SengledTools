@@ -30,7 +30,7 @@ pip install -r requirements.txt
 
 ### Step-by-Step Setup
 
-1) **Factory Reset the Bulb**: Flick the power switch rapidly 5+ times until the bulb flashes and broadcasts `Sengled_Wi‑Fi Bulb_XXXXXX`
+1) **Factory Reset the Bulb**: Flick the power switch rapidly 5+ times until the bulb flashes and broadcasts `Sengled_Wi‑Fi Bulb_XXXXXX`. See [Factory Reset Procedures](docs/RESET_PROCEDURES.md).
 
 2) **Connect to Bulb's AP**: Join the `Sengled_Wi‑Fi Bulb_XXXXXX` network from your computer
 
