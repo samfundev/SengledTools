@@ -264,7 +264,7 @@ def run_wifi_setup(
 								for i, router in enumerate(routers):
 									ssid = router.get('ssid','')
 									pad = " " * max(1, max_len - len(ssid) + 2)
-									signal_bars = "▂▄▆█"[min(int(router.get("signal", 0)), 3)]
+									signal_bars = "▂▄▆█"[0:min(int(router.get("signal", 0)), 4)]
 									info(f"[{i+1}] {ssid}{pad}{signal_bars}")
 
 							# Prompt slightly less indented than items
