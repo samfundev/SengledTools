@@ -47,6 +47,7 @@ class SetupHTTPServer:
                 self.send_header("Content-Length", str(len(payload)))
                 self.end_headers()
                 self.wfile.write(payload)
+                debug(f"sent: {payload}")
 
             def do_POST(self):  # noqa: N802 (stdlib signature)
                 length = int(self.headers.get("Content-Length", 0) or 0)
@@ -68,6 +69,7 @@ class SetupHTTPServer:
                             "success": True,
                         }
                     )
+                    success(f"Served POST on /life2/device/accessCloud.json")
                     return
 
                 if parsed_url.path == "/jbalancer/new/bimqtt":
@@ -80,16 +82,15 @@ class SetupHTTPServer:
                             "port": outer.mqtt_port,
                         }
                     )
+                    success(f"Served POST on /jbalancer/new/bimqtt")
                     return
 
                 self.send_error(404, "Not Found")
 
             def do_GET(self):  # noqa: N802 (stdlib signature)
-                debug(
-                    f"Received GET request on {self.path} from {self.client_address[0]}"
-                )
+                debug(f"Received GET request on {self.path} from {self.client_address[0]}")
                 parsed_url = urlparse(self.path)
-
+                debug(f"Path parsed as {parsed_url.path}")
                 # Treat GET the same for robustness
                 if parsed_url.path == "/life2/device/accessCloud.json":
                     outer.last_client_ip = self.client_address[0]
@@ -102,6 +103,7 @@ class SetupHTTPServer:
                             "success": True,
                         }
                     )
+                    success(f"Served GET on /life2/device/accessCloud.json")
                     return
 
                 if parsed_url.path == "/jbalancer/new/bimqtt":
@@ -114,7 +116,32 @@ class SetupHTTPServer:
                             "port": outer.mqtt_port,
                         }
                     )
+                    success(f"Served GET on /jbalancer/new/bimqtt")
                     return
+
+                if parsed_url.path == "/status":
+                    self._send_json(
+                        {
+                            "last_client_ip": outer.last_client_ip,
+                            "hit_both_points": (
+                                outer._hit_access_cloud.is_set()
+                                and outer._hit_bimqtt.is_set()
+                            ),
+                        }
+                    )
+                    return
+                if parsed_url.path == "/reset":
+                    outer._hit_bimqtt.clear()
+                    outer._hit_access_cloud.clear()
+                    outer.last_client_ip = None
+                    self._send_json(
+                        {
+                            "reset": "success"
+                        }
+                    )
+                    info(f"Reset last bulb statistics")
+                    return
+
                 # Firmware download handler
                 # Security: Only allow .bin files from root directory to prevent path traversal
                 if parsed_url.path.endswith(".bin"):
