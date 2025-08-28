@@ -21,7 +21,7 @@ from sengled.constants import DEFAULT_BROKER_PORT as BROKER_TLS_PORT
 
 def generate_certificates(cert_dir: Path, force_regenerate: bool = False):
     """Generate CA and server certificates if they don't exist or if forced."""
-    cert_dir.mkdir(exist_ok=True)
+    cert_dir.mkdir(parents=True, exist_ok=True)
     
     ca_key_path = cert_dir / "ca.key"
     ca_cert_path = cert_dir / "ca.crt"
