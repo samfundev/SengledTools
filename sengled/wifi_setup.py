@@ -4,6 +4,9 @@ import socket
 from pathlib import Path
 from typing import Optional
 
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
+
 from sengled.utils import get_mac_address
 
 from sengled.utils import get_local_ip, save_bulb
@@ -17,57 +20,101 @@ from sengled.constants import BULB_IP, BULB_PORT, SUPPORTED_TYPECODES, COMPATIBL
 
 
 def _listen_for_bulb_attributes(
-    mqtt_client: MQTTClient, bulb_mac: str, timeout: int = 10
+	mqtt_client: MQTTClient, bulb_mac: str, timeout: int = 10
 ) -> dict[str, str]:
-    """Listen on MQTT for bulb attributes after connection."""
-    attributes = {}
-    
-    required_attributes = {"typeCode", "identifyNO", "supportAttributes"}
-    
-    def on_message(client, userdata, msg):
-        nonlocal attributes
-        try:
-            payload = json.loads(msg.payload.decode())
-            if isinstance(payload, list):
-                for item in payload:
-                    if "type" in item and "value" in item:
-                        attr_type = item["type"]
-                        if attr_type in required_attributes:
-                            attributes[attr_type] = item["value"]
-                            
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            pass
+	"""Listen on MQTT for bulb attributes after connection."""
+	attributes = {}
+	
+	required_attributes = {"typeCode", "identifyNO", "supportAttributes"}
+	
+	def on_message(client, userdata, msg):
+		nonlocal attributes
+		try:
+			payload = json.loads(msg.payload.decode())
+			if isinstance(payload, list):
+				for item in payload:
+					if "type" in item and "value" in item:
+						attr_type = item["type"]
+						if attr_type in required_attributes:
+							attributes[attr_type] = item["value"]
+							
+		except (json.JSONDecodeError, UnicodeDecodeError):
+			pass
 
-    topic = f"wifielement/{bulb_mac}/status"
-    mqtt_client.client.subscribe(topic)
-    mqtt_client.client.on_message = on_message
+	topic = f"wifielement/{bulb_mac}/status"
+	mqtt_client.client.subscribe(topic)
+	mqtt_client.client.on_message = on_message
 
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        if required_attributes.issubset(attributes.keys()):
-            break
-        time.sleep(0.5)
+	start_time = time.time()
+	while time.time() - start_time < timeout:
+		if required_attributes.issubset(attributes.keys()):
+			break
+		time.sleep(0.5)
 
-    mqtt_client.client.unsubscribe(topic)
-    return attributes
+	mqtt_client.client.unsubscribe(topic)
+	return attributes
 
 
 def _print_udp_failure_warning(bulb_mac: str):
-    """Prints a standardized warning when UDP control fails."""
-    warn_("UDP control test failed (non-fatal). If this keeps happening, "
-        "check Windows Firewall/antivirus and allow UDP on port 9080."
-    )
-    info("You can still try controlling the bulb via MQTT from another terminal:")
-    say(f"  MQTT ON:  python sengled_tool.py --mac {bulb_mac} --on")
-    say(f"  MQTT OFF: python sengled_tool.py --mac {bulb_mac} --off")
+	"""Prints a standardized warning when UDP control fails."""
+	warn_("UDP control test failed (non-fatal). If this keeps happening, "
+		"check Windows Firewall/antivirus and allow UDP on port 9080."
+	)
+	info("You can still try controlling the bulb via MQTT from another terminal:")
+	say(f"  MQTT ON:  python sengled_tool.py --mac {bulb_mac} --on")
+	say(f"  MQTT OFF: python sengled_tool.py --mac {bulb_mac} --off")
 
+def _probe_server(host: str, port: int, timeout: float = 1.0) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+# Helpers for external HTTP server in another instance
+def fetch_status(url: str, timeout: float = 3.0) -> Optional[dict]:
+	"""GET {url}, expect JSON: {"last_client_ip": "...", "hit_both_points": bool}."""
+	req = Request(url, headers={"Accept": "application/json"})
+	try:
+		with urlopen(req, timeout=timeout) as resp:
+			body = resp.read().decode("utf-8", errors="replace")
+		data = json.loads(body)
+		if isinstance(data, dict):
+			return data
+	except (HTTPError, URLError, json.JSONDecodeError, TimeoutError):
+		pass
+	return None
+
+def _poll_status_until_both_hit(
+	url: str,
+	total_timeout_sec: float = 180.0,
+	interval_sec: float = 1.0,
+)-> tuple[bool, Optional[str]]:
+	"""
+	Poll /status until hit_both_points == True or timeout.
+	Returns (both_hit, last_client_ip_or_None).
+	"""
+	deadline = time.monotonic() + total_timeout_sec
+	last_ip = None
+	while time.monotonic() < deadline:
+		st = fetch_status(url)
+		if st is not None:
+			last_ip = st.get("last_client_ip")
+			if st.get("hit_both_points") is True:
+				return True, last_ip
+		time.sleep(interval_sec)
+	return False, last_ip
 
 def run_wifi_setup(
 	args,
 	interactive: bool = True,
-) -> tuple[Optional[str], Optional[SetupHTTPServer]]:
+) -> tuple[Optional[str], Optional[object], Optional[bool]]:
 	"""
-	Performs Wi-Fi setup, returning (bulb_mac, setup_server) on success.
+	Performs Wi‑Fi setup.
+
+	Returns a 3-tuple: (bulb_mac, meta, using_external_http_server)
+	  - meta is a SetupHTTPServer instance when we started the server,
+	    or a dict with keys {"last_client_ip", "support_info"} when using an external server.
 	"""
 	# Capture LAN IP before switching to bulb AP; use this for URLs the bulb will hit
 	lan_ip_before_ap = get_local_ip()
@@ -87,7 +134,7 @@ def run_wifi_setup(
 	except KeyboardInterrupt:
 		print("")  # New line after Ctrl+C
 		warn_("Setup cancelled by user")
-		return None, None
+		return None, None, None
 
 	# Refresh local Wi‑Fi IP after user connects to bulb AP (server still binds 0.0.0.0)
 	local_wifi_ip = get_local_ip()
@@ -123,7 +170,7 @@ def run_wifi_setup(
 
 					if not bulb_mac or len(bulb_mac) != 17:
 						warn_(f"Connection failed: {handshake_resp}")
-						return None, None
+						return None, None, None
 
 					s.settimeout(15)
 					success(f"Connected to bulb MAC: {bulb_mac}")
@@ -133,45 +180,58 @@ def run_wifi_setup(
 					# Resolve MQTT target
 					mqtt_host_for_bulb: str
 					mqtt_port_for_bulb: int
-
-					if getattr(args, "broker_ip", None):
-						# External broker is specified
-						mqtt_host_for_bulb = args.broker_ip
-						mqtt_port_for_bulb = getattr(args, "broker_port", BROKER_TLS_PORT)
-						success(
-							f"Using external MQTT broker: {mqtt_host_for_bulb}:{mqtt_port_for_bulb}"
-						)
+					if _probe_server("127.0.0.1", 8883):
+						info("MQTT server port 8883 is already listening. We'll use the running instance.")
+						mqtt_host_for_bulb = local_wifi_ip
+						mqtt_port_for_bulb = 8883
 						_embedded_broker = None
 					else:
-						# No external broker, start the embedded one
-						try:
-							_embedded_broker = EmbeddedBroker(
-								Path.home() / ".sengled" / "certs",
-								verbose=getattr(args, "verbose", False),
-							)
-							_embedded_broker.start()
-							# Use LAN IP captured before AP switch so bulb can reach us on home network
-							mqtt_host_for_bulb = lan_ip_before_ap
-							mqtt_port_for_bulb = BROKER_TLS_PORT
+						if getattr(args, "broker_ip", None):
+							# External broker is specified
+							mqtt_host_for_bulb = args.broker_ip
+							mqtt_port_for_bulb = getattr(args, "broker_port", BROKER_TLS_PORT)
 							success(
-								f"MQTT broker running on {lan_ip}:{BROKER_TLS_PORT} (TLS)",
-								extra_indent=4,
+								f"Using external MQTT broker: {mqtt_host_for_bulb}:{mqtt_port_for_bulb}"
 							)
-						except Exception as e:
-							warn_(str(e)) # Display the clean message from the broker
-							info(
-								"If you are running a custom broker, use the --broker-ip and --broker-port arguments."
-							)
-							return None, None
+							_embedded_broker = None
+						else:
+							# No external broker, start the embedded one
+							try:
+								_embedded_broker = EmbeddedBroker(
+									Path.home() / ".sengled" / "certs",
+									verbose=getattr(args, "verbose", False),
+								)
+								_embedded_broker.start()
+								# Use LAN IP captured before AP switch so bulb can reach us on home network
+								mqtt_host_for_bulb = lan_ip_before_ap
+								mqtt_port_for_bulb = BROKER_TLS_PORT
+								success(
+									f"MQTT broker running on {lan_ip}:{BROKER_TLS_PORT} (TLS)",
+									extra_indent=4,
+								)
+							except Exception as e:
+								warn_(str(e)) # Display the clean message from the broker
+								info(
+									"If you are running a custom broker, use the --broker-ip and --broker-port arguments."
+								)
+								return None, None
 
-					# Start HTTP server for endpoints
-					preferred_http_port = int(getattr(args, "http_port", 8080) or 8080)
-					setup_server = SetupHTTPServer(
-						mqtt_host=mqtt_host_for_bulb,
-						mqtt_port=mqtt_port_for_bulb,
-						preferred_port=preferred_http_port,
-					)
-					server_started = setup_server.start()
+					if _probe_server("127.0.0.1", 57542):
+						info("HTTP server port 57542 is already listening. We'll use the running instance.")
+						preferred_http_port = 57542
+						server_started = True
+						using_external_http_server = True
+					else:
+						# Start HTTP server for endpoints
+						preferred_http_port = int(getattr(args, "http_port", 57542) or 57542)
+						setup_server = SetupHTTPServer(
+							mqtt_host=mqtt_host_for_bulb,
+							mqtt_port=mqtt_port_for_bulb,
+							preferred_port=preferred_http_port,
+						)
+						server_started = setup_server.start()
+						using_external_http_server = False
+
 					if _embedded_broker:
 						setattr(setup_server, "embedded_broker", _embedded_broker)
 
@@ -213,22 +273,38 @@ def run_wifi_setup(
 
 							# Prompt slightly less indented than items
 							_si(_base + 6)
-							try:
-								info("")
-								choice_input = input(f"      Select network (1-{len(routers)}) or 0 to rescan: ").strip()
-								choice = int(choice_input or "-1")
-							except ValueError:
-								choice = -1
-
-							if choice == 0:
-								# Silent rescan; loop reiterates and prints scan header again
+							info("")
+							prompt_shown = False
+							while True:
+								# Keep prompting until valid selection or explicit rescan
+								try:
+									prompt_range = f"(1-{len(routers)})" if len(routers) > 0 else "(none)"
+									prompt_text = f"      Select network {prompt_range} or 0 to rescan: " if not prompt_shown else ""
+									choice_input = input(prompt_text).strip()
+									prompt_shown = True
+								except KeyboardInterrupt:
+									raise
+								if choice_input == "0":
+									# Explicit rescan
+									break
+								try:
+									choice = int(choice_input or "-1")
+								except ValueError:
+									# Invalid input; re-prompt without rescanning
+									continue
+								if 1 <= choice <= len(routers):
+									chosen_router = routers[choice - 1]
+									wifi_ssid = chosen_router.get("ssid", "")
+									wifi_bssid = chosen_router.get("bssid", "")
+									_si(_base + 6)
+									info(f"Selected network: {wifi_ssid}")
+									# Exit both prompt loop and scan loop
+									break
+							# If we got here, user asked to rescan; restart outer loop
+							if choice_input == "0":
 								continue
-							if 1 <= choice <= len(routers):
-								chosen_router = routers[choice - 1]
-								wifi_ssid = chosen_router.get("ssid", "")
-								wifi_bssid = chosen_router.get("bssid", "")
-								_si(_base + 6)
-								info(f"Selected network: {wifi_ssid}")
+							else:
+								# Valid selection was made; break outer loop
 								break
 
 						# Get password interactively
@@ -242,14 +318,14 @@ def run_wifi_setup(
 
 						if not wifi_ssid or not wifi_pass:
 							warn_("Non-interactive Wi-Fi setup requires --ssid and --password arguments.")
-							return None, None
+							return None, None, None
 
 						# For non-interactive, we must assume the SSID is ASCII.
 						# The bulb protocol requires BSSID for non-ASCII SSIDs.
 						if not all(ord(c) < 128 for c in wifi_ssid):
 							warn_("Non-ASCII SSIDs are not supported in non-interactive mode because BSSID cannot be determined.")
 							warn_("Please run the setup in interactive mode.")
-							return None, None
+							return None, None, None
 
 						info("")
 						info(f"Using provided Wi-Fi network: {wifi_ssid}")
@@ -263,7 +339,7 @@ def run_wifi_setup(
 					re_handshake_resp = json.loads(data.decode("utf-8"))
 					if not re_handshake_resp.get("payload", {}).get("result"):
 						warn_("Configuration prep failed")
-						return None, None
+						return None, None, None
 
 					# Configure Network
 					config_step = "[5/6]" if interactive else "[3/4]"
@@ -279,7 +355,7 @@ def run_wifi_setup(
 						router_info = {"ssid": "", "bssid": wifi_bssid.upper(), "password": wifi_pass}
 
 					# Use the actual HTTP setup server port we bound and the remembered WiFi IP address
-					http_port = str(setup_server.port)
+					http_port = str(preferred_http_port)
 					http_host = http_host_for_urls
 					params_payload = {
 						"name": "setParamsRequest",
@@ -355,13 +431,23 @@ def run_wifi_setup(
 					if is_verbose():
 						info("Expected endpoints: /life2/device/accessCloud.json and /jbalancer/new/bimqtt")
 					
-					both_hit = setup_server.wait_until_both_endpoints_hit(timeout_seconds=180)
-					if both_hit:
+					if not using_external_http_server:
+						both_hit = setup_server.wait_until_both_endpoints_hit(timeout_seconds=180)
 						client_ip = setup_server.last_client_ip
+					else:
+						info("Checking external server /status until both endpoints are hit…")
+						both_hit, client_ip = _poll_status_until_both_hit(
+							"http://127.0.0.1:57542/status", total_timeout_sec=180.0, interval_sec=1.0
+						)
+
+					# Initialize support_info regardless of path, so it's always defined
+					support_info = None
+
+					if both_hit:
 						success(f"Bulb at {client_ip} contacted both endpoints", extra_indent=2)
 							
 						# Listen for bulb attributes
-						mqtt_client = create_mqtt_client(args, broker_host=args.broker_ip if hasattr(args, 'broker_ip') and args.broker_ip else "127.0.0.1")
+						mqtt_client = create_mqtt_client(args, mqtt_host_for_bulb, mqtt_port_for_bulb)
 						if mqtt_client.connect():
 							try:
 								info("")
@@ -396,17 +482,17 @@ def run_wifi_setup(
 					else:
 						warn_("Timeout waiting for endpoints")
 
-					if both_hit:
-						debug("Proceeding to UDP control test...")
-					else:
-						debug("Proceeding to UDP control test anyway...")
+
+					# Reset external HTTP server
+					if using_external_http_server:
+						fetch_status("http://127.0.0.1:57542/reset")
 
 					# 9) Try UDP until both OFF and ON succeed; report elapsed time
 					if server_started:
 						info("")  # Add blank line before UDP test
 						try:
-							udp_target_ip = setup_server.last_client_ip or BULB_IP
-							if setup_server.last_client_ip:
+							udp_target_ip = client_ip or BULB_IP
+							if client_ip:
 								_ok = udp_toggle_until_success(udp_target_ip, max_wait_seconds=60)
 								if not _ok:
 									_print_udp_failure_warning(bulb_mac)
@@ -420,7 +506,13 @@ def run_wifi_setup(
 				# Auto-retry silently; we already showed a single 'Looking for bulb...' line
 				continue
 
-		return bulb_mac, setup_server
+		# Keep internal server running so we can flash right away; external server isn't ours.
+		if using_external_http_server:
+			meta = {"last_client_ip": client_ip, "support_info": support_info}
+		else:
+			meta = setup_server
+
+		return bulb_mac, meta, using_external_http_server
 
 	except KeyboardInterrupt:
 		if server_started and setup_server and setup_server.active:
@@ -432,7 +524,7 @@ def run_wifi_setup(
 			except Exception:
 				pass
 		warn_("Interrupted by user. Exiting setup.")
-		return None, None
+		return None, None, None
 	except Exception as e:
 		if setup_server and setup_server.active:
 			setup_server.stop()
@@ -442,6 +534,6 @@ def run_wifi_setup(
 			except Exception:
 				pass
 		warn_(f"Setup failed: {e}")
-		return None, None
+		return None, None, None
 
 

@@ -220,14 +220,14 @@ class SengledTool:
     def non_interactive_wifi_setup(self, broker_ip: str, ssid: str, password: str):
         run_wifi_setup(self.args, interactive=False)
 
-    def _stop_servers(self, setup_server: Optional[SetupHTTPServer]):
-        if setup_server:
+    def _stop_servers(self, setup_server: Optional[SetupHTTPServer] = None):
+        if setup_server and hasattr(setup_server, "stop"):
             setup_server.stop()
-        broker = self._embedded_broker or getattr(setup_server, "embedded_broker", None)
-        if broker:
+        broker = self._embedded_broker or (getattr(setup_server, "embedded_broker", None) if setup_server else None)
+        if broker and hasattr(broker, "stop"):
             broker.stop()
 
-    def _post_wifi_setup_flow(self, bulb_mac: str, setup_server) -> None:
+    def _post_wifi_setup_flow(self, bulb_mac: str, setup_meta) -> None:
         """After Wi‑Fi setup: print summary, gate flashing by compatibility, optionally flash.
 
         Flow:
@@ -235,11 +235,22 @@ class SengledTool:
         - If `--setup-wifi` was provided, caller handles final summary/hold; otherwise we prompt to flash.
         - Flashing is gated by `setup_server.support_info` and `--force-flash`.
         """
-        # Show immediate next steps for control
-        _print_post_pairing_summary(bulb_mac, getattr(setup_server, "last_client_ip", None))
+        # Extract last_client_ip and support_info regardless of whether we have a server object or dict
+        if isinstance(setup_meta, dict):
+            last_client_ip = setup_meta.get("last_client_ip")
+            support_info = setup_meta.get("support_info")
+            setup_server = None
+        elif isinstance(setup_meta, str):
+            last_client_ip = setup_meta
+            support_info = None
+            setup_server = None
+        else:
+            setup_server = setup_meta
+            last_client_ip = getattr(setup_server, "last_client_ip", None)
+            support_info = getattr(setup_server, "support_info", None)
 
-        # Determine support category gathered during attribute probe (if any)
-        support_info = getattr(setup_server, "support_info", None)
+        # Show immediate next steps for control
+        _print_post_pairing_summary(bulb_mac, last_client_ip)
         category = (support_info or {}).get("category", "unknown")
         model = (support_info or {}).get("model", "Unknown")
         module = (support_info or {}).get("module", "Unknown")
@@ -267,7 +278,7 @@ class SengledTool:
             info("")
             choice = input("Flash custom firmware (jailbreak) now? (y/N): ").strip().lower()
         except KeyboardInterrupt:
-            info("\nSkipping firmware upgrade.")
+            info("\nSkipping firmware upgrade. Shutting down servers.")
             self._stop_servers(setup_server)
             return
 
@@ -328,6 +339,7 @@ def handle_run_servers(args, resolved_broker_ip: str):
     from pathlib import Path
     
     section("Starting Servers")
+    info("You might need to wait up to a minute or so for the bulb to reconnect")
     
     # Start embedded MQTT broker
     cert_dir = Path.home() / ".sengled" / "certs"
@@ -340,7 +352,7 @@ def handle_run_servers(args, resolved_broker_ip: str):
         return
     
     # Start HTTP server
-    http_port = args.http_port or 8080
+    http_port = args.http_port or 57542
     http_server_ip = args.http_server_ip or resolved_broker_ip
     
     server = SetupHTTPServer(
@@ -509,8 +521,8 @@ def main():
     parser.add_argument(
         "--http-port",
         type=int,
-        default=8080,
-        help="HTTP server port (default: 8080).",
+        default=57542,
+        help="HTTP server port (default: 57542).",
     )
     parser.add_argument(
         "--http-server-ip",
@@ -593,15 +605,30 @@ def main():
             "This tool will guide you through Wi-Fi network setup, bulb control, and firmware flashing."
         )
 
-        bulb_mac, setup_server = run_wifi_setup(args, interactive=is_interactive)
+        try:
+            bulb_mac, meta, using_external = run_wifi_setup(args, interactive=is_interactive)
+        except KeyboardInterrupt:
+            warn("\nWi-Fi setup interrupted by user. Exiting.")
+            sys.exit(1)
 
-        if bulb_mac and setup_server:
+        if bulb_mac and meta is not None:
             # For --setup-wifi, show hold summary; otherwise prompt for flashing.
             if args.setup_wifi:
-                _print_final_summary_and_hold(bulb_mac, setup_server.last_client_ip)
-                tool._stop_servers(setup_server)
+                if isinstance(meta, dict):
+                    last_bulb_ip = meta.get("last_client_ip")
+                    server_to_stop = None
+                elif isinstance(meta, str):
+                    last_bulb_ip = meta
+                    server_to_stop = None
+                else:
+                    last_bulb_ip = getattr(meta, "last_client_ip", None)
+                    server_to_stop = meta if hasattr(meta, "stop") else None
+
+                _print_final_summary_and_hold(bulb_mac, last_bulb_ip)
+                if not using_external:
+                    tool._stop_servers(server_to_stop)
             else:
-                tool._post_wifi_setup_flow(bulb_mac, setup_server)
+                tool._post_wifi_setup_flow(bulb_mac, meta)
         else:
             # run_wifi_setup prints its own errors, so we just add a final status
             warn("Wi-Fi setup did not complete.")
@@ -624,11 +651,15 @@ def main():
             "This tool will guide you through Wi-Fi network setup, bulb control, and firmware flashing."
         )
 
-        bulb_mac, setup_server, external_servers = run_wifi_setup(args, interactive=True)
+        try:
+            bulb_mac, meta, using_external = run_wifi_setup(args, interactive=True)
+        except KeyboardInterrupt:
+            warn("\nWi-Fi setup interrupted by user. Exiting.")
+            sys.exit(1)
 
-        if bulb_mac and setup_server:
+        if bulb_mac and meta is not None:
             # In default flow (no --setup-wifi), proceed to flashing prompt
-            tool._post_wifi_setup_flow(bulb_mac, setup_server)
+            tool._post_wifi_setup_flow(bulb_mac, meta)
         else:
             # run_wifi_setup prints its own errors, so we just add a final status
             warn("Wi-Fi setup did not complete.")
