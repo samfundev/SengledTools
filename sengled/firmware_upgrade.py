@@ -66,7 +66,7 @@ def print_upgrade_post_send_instructions(concise: bool = False) -> None:
     warn("⚠️  THERE'S NO GOING BACK - Your bulb only knows the shim firmware now")
     
     if not concise:
-        info("Press Ctrl+C after you see firmware downloaded in your server window")
+        info("Press Ctrl+C after you see firmware downloaded below")
         info("Then your device should be running the uploaded code")
 
 

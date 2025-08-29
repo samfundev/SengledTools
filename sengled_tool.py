@@ -593,16 +593,15 @@ def main():
             "This tool will guide you through Wi-Fi network setup, bulb control, and firmware flashing."
         )
 
-        bulb_mac, last_bulb_ip, external_servers = run_wifi_setup(args, interactive=is_interactive)
+        bulb_mac, setup_server = run_wifi_setup(args, interactive=is_interactive)
 
-        if bulb_mac and last_bulb_ip:
+        if bulb_mac and setup_server:
             # For --setup-wifi, show hold summary; otherwise prompt for flashing.
             if args.setup_wifi:
-                _print_final_summary_and_hold(bulb_mac, last_bulb_ip)
-                if not external_servers:
-                    tool._stop_servers()
+                _print_final_summary_and_hold(bulb_mac, setup_server.last_client_ip)
+                tool._stop_servers(setup_server)
             else:
-                tool._post_wifi_setup_flow(bulb_mac, last_bulb_ip)
+                tool._post_wifi_setup_flow(bulb_mac, setup_server)
         else:
             # run_wifi_setup prints its own errors, so we just add a final status
             warn("Wi-Fi setup did not complete.")
