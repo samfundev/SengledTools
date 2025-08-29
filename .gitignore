@@ -13,4 +13,3 @@ __pycache__/
 
 # local-only tools and artifacts
 extras/
-.DS_Store

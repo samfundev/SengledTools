@@ -275,24 +275,52 @@ class CommandHandler:
                 if not os.path.isfile(firmware_path):
                     warn(f"Firmware file '{firmware_path}' does not exist.")
                     sys.exit(2)
-                if not self.tool._probe_broker("127.0.0.1", 8883):
-                    warn("Port 8883 is not listening on your PC. Start sengled_tool.py --run-servers in another terminal first. Also good to test MQTT commands like --brightness before flashing.")
-                    sys.exit(2)
                 firmware_bin = prepare_firmware_bin(self.args.upgrade)
                 if not firmware_bin:
                     sys.exit(2)  # Abort if validation or copy fails
-                upgrade_broker_host = get_local_ip()
-                upgrade_broker_port = 8883
+                preferred_http_port = int(getattr(self.args, "http_port", 8080) or 8080)
+                orig_host = self.args.broker_ip or get_local_ip()
+                upgrade_broker_host = (
+                    orig_host
+                    if orig_host not in ("127.0.0.1", "localhost")
+                    else get_local_ip()
+                )
+                try:
+                    upgrade_broker_port = (
+                        BROKER_TLS_PORT
+                        if orig_host in ("127.0.0.1", "localhost")
+                        else int(self.args.broker_port or DEFAULT_BROKER_PORT)
+                    )
+                except (TypeError, ValueError):
+                    upgrade_broker_port = (
+                        BROKER_TLS_PORT
+                        if orig_host in ("127.0.0.1", "localhost")
+                        else DEFAULT_BROKER_PORT
+                    )
+                upgrade_server = SetupHTTPServer(
+                    mqtt_host=upgrade_broker_host,
+                    mqtt_port=upgrade_broker_port,
+                    preferred_port=preferred_http_port,
+                )
+
+                server_started = upgrade_server.start()
+
                 local_ip = get_local_ip()
-                http_port = 8080
+                http_port = str(upgrade_server.port)
                 firmware_filename = os.path.basename(firmware_path)
                 firmware_url = f"http://{local_ip}:{http_port}/{firmware_filename}"
-                info(f"Will request firmware upgrade URL: {firmware_url}")
+                info(f"Serving firmware: {firmware_url}")
 
                 print_morpheus_last_chance()
                 command = build_cmd_list(self.args.mac, "update", firmware_url)
                 send_update_command(client, self.args.mac, command)
                 print_upgrade_post_send_instructions()
+                try:
+                    while True:
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    upgrade_server.stop()
+                    say("Server stopped. Good luck!")
 
             elif self.args.reset:
                 command = build_cmd_list(self.args.mac, "reset", "1")
