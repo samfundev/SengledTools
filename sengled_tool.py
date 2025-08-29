@@ -624,7 +624,7 @@ def main():
             "This tool will guide you through Wi-Fi network setup, bulb control, and firmware flashing."
         )
 
-        bulb_mac, setup_server = run_wifi_setup(args, interactive=True)
+        bulb_mac, setup_server, external_servers = run_wifi_setup(args, interactive=True)
 
         if bulb_mac and setup_server:
             # In default flow (no --setup-wifi), proceed to flashing prompt
