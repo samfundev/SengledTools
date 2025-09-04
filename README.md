@@ -70,7 +70,16 @@ It will basically run the --upgrade option to install Sengled-Rescue:
 python sengled_tool.py --mac E8:DB:8A:AA:BB:CC --upgrade "shim.bin"
 ```
 
+The script will print some scary warning messages to make sure you are prepared for the upgrade. At this time, download and unzip the [Tasmota OTA bin firmware](https://ota.tasmota.com/tasmota/release/) or compile one for ESPHome. For basic usage of the setup_tool script, proceed with the default firmware path. Once the bulb has accepted the shim, the script will finish, but **you're not done yet**.
 
+Look for the Sengled-Rescue Wifi network and join it. Then navigate to http://192.168.4.1 in a browser. It will be slow, so be patient and refresh until it loads.
+
+![Sengled-Rescue UI](docs/images/sengled_rescue_ui.png)
+
+1. Optional, but recommended: make a full backup of the chip. Select full > backup selected.
+2. Select boot > choose file (pick the Tasmota or ESPHome bin) > flash selected
+
+The bulb will accept the update and reboot. It may flash different colors and will take a few minutes. For Tasmota, once an RGBW bulb has been setup, it will do a slow red blink to indicate it needs to be connected to Wifi. To do so, connect to the `tasmota_XXXXXX-####` Wifi network and visit http://192.168.4.1 to set up the credentials. Then you can control the device by visiting its IP address—found on the connection page or by checking which devices are connected to your router.
 
 The **flashing/jailbreaking process** is based on testing with **W31-N15 and W31-N11** bulbs, which use Sengled's WF863 module (based on ESP8266EX). **Other bulbs appear to use other modules** (like WF864, based on MX1290 chip), which may not work with the flashing process. The basic MQTT/UDP control should work with most Sengled bulbs. We're working on acquiring other bulbs to test/develop with them and will add to this list.
 
@@ -87,14 +96,13 @@ The **flashing/jailbreaking process** is based on testing with **W31-N15 and W31
 
 > **Tip:** Check the side of your bulb for FCC ID - it contains the ID of the module (or chip) used inside the bulb, matching one of the above. Post an issue if you find a bulb using a supported module that's not listed!
 
-
 ---
 
 
 
 ### Tasmota Templates
 
-When flashing Tasmota firmware to your Sengled bulbs, use these device templates:
+When flashing Tasmota firmware to your Sengled bulbs, use these device templates by [importing in the web UI](https://tasmota.github.io/docs/Templates/#importing-templates):
 
 #### W31-N15 (RGBW Bulb)
 
@@ -223,7 +231,21 @@ UDP Control (Local Network):
 ## FAQ
 
 <details>
-<summary>How do I use this with Home Assistant?</summary>
+<summary>I'm able to set up the Wifi connection on the bulb, but verification times out.</summary>
+
+</details>
+This is because your bulb is unable to communicate with the servers running on your computer. Make sure:
+
+ - your computer is on the same Wifi network as the bulb
+ - the Wifi network has been configured to allow devices to see each other
+   - tip: log into your router at http://192.168.0.1/ to check and modify this setting
+ - see if a firewall configuration might be preventing the requests
+
+To further troubleshoot, make note of your local IP (which is output by the setup wizard) and then use another device (phone/pc) that's on the same network to visit `http://yourlocalIP:57542/jbalancer/new/bimqtt`. It should return some text output. If it does not, continue troubleshooting network settings until you can access the page.
+
+<details>
+
+<summary>Can I use this with Home Assistant?</summary>
 
 **Yes, but only if custom firmware (like Tasmota) is used.** 
 
@@ -240,6 +262,7 @@ UDP Control (Local Network):
 
 **Yes, with the documented MQTT and UDP commands.** For advanced users yes, you can use webhooks, automation scripts, or create a simple control interface. Options include: a small Android app, a simple script/service on a PC or server triggered by your phone (shortcuts/webhooks), or any automation that publishes the documented MQTT or UDP commands. The two servers (MQTT and HTTP) are necessary.
 
+If you flash Tasmota onto the bulbs, you can use the basic web interface to control the color brightness and set up timers. This does not require additional hardware or software.
 </details>
 
 ## Wi-Fi Setup Sequence
@@ -248,4 +271,4 @@ The Wi-Fi pairing process follows a specific sequence of UDP commands and HTTP r
 
 ## Next Steps
 
-For detailed troubleshooting and advanced usage, see [Advanced Instructions](docs/examples/INSTRUCTIONS_ADVANCED.md).
+For detailed troubleshooting and advanced usage, see [Advanced Instructions](docs/INSTRUCTIONS_ADVANCED.md).
