@@ -25,7 +25,7 @@ Regenerate at any time:
 python sengled_tool.py --regen-certs
 ```
 
-If you prefer manual generation with OpenSSL, see [certificate_generation.md](certificate_generation.md).
+If you prefer manual generation with OpenSSL, see [CERTIFICATE_GENERATION.md](examples/CERTIFICATE_GENERATION.md).
 
 Examples:
 
