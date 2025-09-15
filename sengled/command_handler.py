@@ -85,9 +85,7 @@ class CommandHandler:
                 r, g, b = self.args.udp_color
                 r, g, b = int(r), int(g), int(b)
                 if all(0 <= val <= 255 for val in [r, g, b]):
-                    # Bulb protocol expects color in "R:G:B" decimal format
-                    color_dec = f"{r:d}:{g:d}:{b:d}"
-                    payload = {"func": "set_device_color", "param": {"color": color_dec}}
+                    payload = {"func": "set_device_color", "param": {"red": r, "green": g, "blue": b}}
                     send_udp_command(self.args.ip, payload)
                 else:
                     warn("Color values must be between 0 and 255")
