@@ -33,7 +33,21 @@ python sengled_tool.py --ip 192.168.8.1 --udp-color 255 0 0
 |--------|------------------|------------------|
 | `set_device_switch` | `{"func":"set_device_switch","param":{"switch":1}}` | `{"func":"set_device_switch","result":{"ret":0,"msg":"success"}}` |
 | `set_device_brightness` | `{"func":"set_device_brightness","param":{"brightness":50}}` | `{"func":"set_device_brightness","result":{"ret":0,"msg":"success"}}` |
-| `set_device_color` | `{"func":"set_device_color","param":{"color":"255:0:0"}}` | `{"func":"set_device_color","result":{"ret":0,"msg":"success"}}` |
+| `get_device_brightness` | `{"func":"get_device_brightness","param":{}}` | `{"func":"get_device_brightness","result":{"brightness":100,"ret":0,"msg":"success"}}` |
+| `set_device_color` | `{"func":"set_device_color","param":{"red":255,"green":0,"blue":0}}` | `{"func":"set_device_color","result":{"ret":0,"msg":"success"}}` |
+| `get_device_adc` | `{"func":"get_device_adc","param":{}}` | `{"func":"get_device_adc","result":{"adc":630.73,"msg":"success"}}` |
+| `get_device_mac` | `{"func":"get_device_mac","param":{}}` | `{"func":"get_device_mac","result":{"mac":"00:00:00:00:00:00","ret":0,"msg":"success"}}` |
+| `set_factory_mode` | `{"func":"set_factory_mode","param":{}}` | `{"func":"set_factory_mode","result":{"ret":0,"msg":"success"}}` |
+| `get_factory_mode` | `{"func":"get_factory_mode","param":{}}` | `{"func":"get_factory_mode","result":{"mode":0,"ret":0,"msg":"success"}}` |
+| `get_software_version` | `{"func":"get_software_version","param":{}}` | `{"func":"get_software_version","result":{"version":"RDSW2019004A0530_W21-N13_SYSTEM_V1.0.1.0_20200610_release","ret":0,"msg":"success"}}` |
+| `set_device_colortemp` | `{"func":"set_device_colortemp","param":{"colorTemperature":100}}` | `{"func":"set_device_colortemp","result":{"ret":0,"msg":"success"}}` |
+| `set_device_pwm` | `{"func":"set_device_pwm","param":{"r":0,"g":0,"b":0,"w":0}}` | `{"func":"set_device_pwm","result":{"ret":0,"msg":"success"}}` |
+| `search_devices` | `{"func":"search_devices","param":{}}` | `{"func":"search_devices","result":{"ret":0,"mac":"00:00:00:00:00:00","ip":"192.168.8.1","config_state":1,"bind_state":1,"mqtt_state":0,"version":"RDSW2019004A0530_W21-N13_SYSTEM_V1.0.1.0_20200610_release","R":{"freq":0,"value":0},"G":{"freq":0,"value":0},"B":{"freq":0,"value":0},"W":{"freq":0,"value":38},"msg":"success"}}` |
+| `update_led_firmware` | `{"func":"update_led_firmware","param":{"ota_url":"..."}}` | `{"func":"update_led_firmware","result":{"ret":0,"msg":"success"}}` |
+| `reboot` | `{"func":"reboot","param":{}}` | `{"func":"reboot","result":{"ret":0,"msg":"success"}}` |
+| `set_device_reboot` | `{"func":"set_device_reboot","param":{}}` | `{"func":"set_device_reboot","result":{"ret":0,"msg":"success"}}` |
+| `factory_reset` | `{"func":"factory_reset","param":{}}` | `{"func":"factory_reset","result":{"ret":0,"msg":"success"}}` |
+| `set_factory_reset` | `{"func":"set_factory_reset","param":{}}` | `{"func":"set_factory_reset","result":{"ret":0,"msg":"success"}}` |
 
 ---
 
@@ -65,8 +79,8 @@ python sengled_tool.py --ip 192.168.8.1 --udp-json '{"func":"set_device_switch",
 # Brightness 50
 python sengled_tool.py --ip 192.168.8.1 --udp-json '{"func":"set_device_brightness","param":{"brightness":50}}'
 
-# Color red (255:0:0 format)
-python sengled_tool.py --ip 192.168.8.1 --udp-json '{"func":"set_device_color","param":{"color":"255:0:0"}}'
+# Color red
+python sengled_tool.py --ip 192.168.8.1 --udp-json '{"func":"set_device_color","param":{"red":255,"green":0,"blue":0}}'
 ```
 
 ---
